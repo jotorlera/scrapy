@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import calendar
 import hashlib
 import html
 import re
 from datetime import UTC, datetime
-from time import mktime, struct_time
+from time import struct_time
 
 from dateutil import parser as dateparser
 
@@ -37,7 +38,9 @@ def to_iso(value) -> str | None:
         return None
     try:
         if isinstance(value, struct_time):
-            dt = datetime.fromtimestamp(mktime(value), tz=UTC)
+            # feedparser entrega struct_time ya en UTC: timegm lo interpreta como UTC (mktime lo haría como hora
+            # local y desplazaría cada fecha 1-2 h en cualquier máquina que no esté en UTC)
+            dt = datetime.fromtimestamp(calendar.timegm(value), tz=UTC)
         elif isinstance(value, datetime):
             dt = value if value.tzinfo else value.replace(tzinfo=UTC)
         else:

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../api/client'
+import { startDietSession, type DietLogBody } from './diet'
 
 export interface AsyncState<T> {
   data: T | null
@@ -40,18 +41,27 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]): AsyncState<T
   return { data, error, loading, reload }
 }
 
-/** Registro de dieta: `open` al montar, `read` con los segundos al desmontar. */
+/** Envío que sobrevive al cierre de la pestaña: sendBeacon (mismo origen, JSON) y, si no, fetch con keepalive. */
+function sendDietLog(body: DietLogBody): void {
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      const blob = new Blob([JSON.stringify(body)], { type: 'application/json' })
+      if (navigator.sendBeacon('/api/diet/log', blob)) return
+    }
+  } catch {
+    /* sin sendBeacon: fetch keepalive */
+  }
+  void api.dietLog(body, true).catch(() => undefined)
+}
+
+/** Registro de dieta: `open` al montar (marcador) y `read` con los segundos realmente visibles al ocultar la
+ *  pestaña, al descargar la página o al desmontar (lógica en lib/diet.ts). */
 export function useDietLog(ref: { event_id?: string | null; document_id?: string | null }, enabled = true): void {
   const eventId = ref.event_id ?? undefined
   const docId = ref.document_id ?? undefined
   useEffect(() => {
     if (!enabled || (!eventId && !docId)) return
-    const started = Date.now()
-    void api.dietLog({ event_id: eventId, document_id: docId, action: 'open' }).catch(() => undefined)
-    return () => {
-      const seconds = Math.round((Date.now() - started) / 1000)
-      if (seconds >= 3) void api.dietLog({ event_id: eventId, document_id: docId, action: 'read', seconds }, true).catch(() => undefined)
-    }
+    return startDietSession({ event_id: eventId, document_id: docId }, { send: sendDietLog })
   }, [eventId, docId, enabled])
 }
 

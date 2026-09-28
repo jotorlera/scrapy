@@ -8,7 +8,7 @@ import { MaterialityBar } from '../components/ui/MaterialityBar'
 import { QuoteHover } from '../components/ui/QuoteHover'
 import { fmtAgo, fmtDateTime, fmtPct, fmtVolume, seqColor } from '../lib/format'
 import { useAsync, useDietLog } from '../lib/hooks'
-import { blocLabel, channelLabel, dimensionLabel, ideologyLabel, IDEOLOGY_ORDER, paywallLabel, sourceTypeLabel, stateRelationLabel, TRADITIONS } from '../lib/labels'
+import { blocLabel, channelLabel, dimensionLabel, eventStatusLabel, ideologyLabel, IDEOLOGY_ORDER, paywallLabel, questionStatusLabel, sourceTypeLabel, stateRelationLabel, TRADITIONS } from '../lib/labels'
 import { useStore } from '../state/store'
 import './screens.css'
 
@@ -122,7 +122,7 @@ export default function EventDetail() {
             ← Eventos
           </Link>
           <ProvenanceChip titleSource={ev.title_source} />
-          <span className="chip">{ev.status}</span>
+          <span className="chip">{eventStatusLabel(ev.status)}</span>
           {ev.user_flag && <span className="chip accent">{ev.user_flag === 'important' ? 'importante' : 'ruido'}</span>}
           <span className="muted small mono" style={{ marginLeft: 'auto' }}>
             visto {fmtAgo(ev.first_seen_at)} · actualizado {fmtAgo(ev.last_update_at)}
@@ -407,7 +407,7 @@ export default function EventDetail() {
             {data.questions.map((q) => {
               const entries = Object.entries(q.latest)
               return (
-                <Card key={q.id} title={<Link to={`/pronosticos/${q.id}`}>{q.title}</Link>} extra={<span className="chip">{q.status}</span>}>
+                <Card key={q.id} title={<Link to={`/pronosticos/${q.id}`}>{q.title}</Link>} extra={<span className="chip">{questionStatusLabel(q.status)}</span>}>
                   <div className="pbars">
                     {entries.length === 0 && <span className="muted">Sin pronósticos todavía.</span>}
                     {entries.map(([f, p]) => (

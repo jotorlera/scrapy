@@ -4,15 +4,20 @@
 :root {
   /* Paleta base */
   --c-accent: #ffd100;
+  /* Negro real: texto sobre amarillo, chips oscuros, toasts, selección. Nunca como trazo sobre el fondo. */
   --c-black: #000000;
+  /* Tinta invertible: bordes, aristas, barras, puntos y contornos. Se invierte en el tema oscuro. */
+  --c-ink: #000000;
   --c-heading: #0b0b0b;
   --c-text: #1d1d1d;
-  --c-muted: #757575;
+  /* Grises y azul de texto un paso más oscuros que la guía Hespérides (#757575, #2B7BB9) para
+     alcanzar WCAG 2.1 AA (≥ 4,5:1) también sobre --c-surface y --c-surface-2. */
+  --c-muted: #6b6b6b;
   --c-line: #e6e6e6;
   --c-bg: #ffffff;
   --c-surface: #f7f7f7;
   --c-surface-2: #ededed;
-  --c-link: #2b7bb9;
+  --c-link: #256fa8;
   --c-warn: #bd382f;
   --c-on-accent: #000000;
 
@@ -22,9 +27,9 @@
 
   /* Estados de afirmación (siempre con icono y texto) */
   --c-confirmed: #2e7d32;
-  --c-disputed: #b26a00;
+  --c-disputed: #9a6000;
   --c-denied: #bd382f;
-  --c-unverified: #757575;
+  --c-unverified: var(--c-muted);
 
   /* Escala secuencial de un solo tono: amarillo → negro */
   --c-seq-lo: #ffd100;
@@ -91,6 +96,7 @@
 
 :root[data-theme='dark'] {
   --c-black: #000000;
+  --c-ink: #f2f2f2;
   --c-heading: #ffffff;
   --c-text: #f2f2f2;
   --c-muted: #a0a0a0;
@@ -105,7 +111,7 @@
   --c-confirmed: #6cbf6f;
   --c-disputed: #e0a03a;
   --c-denied: #e0574d;
-  --c-unverified: #a0a0a0;
+  --c-unverified: var(--c-muted);
   --c-seq-hi: #f2f2f2;
   --dom-politics: #f2f2f2;
   --dom-economy: #6fb0e6;

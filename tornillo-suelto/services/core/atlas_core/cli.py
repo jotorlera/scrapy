@@ -1,4 +1,4 @@
-"""CLI: atlas seed | ingest | markets | brief | serve | stats | verify-feeds."""
+"""CLI: atlas seed | ingest | markets | recompute | brief | serve | stats | verify-feeds | repair-relative-urls."""
 
 from __future__ import annotations
 
@@ -106,6 +106,17 @@ def stats() -> None:
     }
     out["llm_cost_usd_total"] = db.scalar("SELECT COALESCE(SUM(cost_usd),0) FROM llm_call", (), 0)
     typer.echo(json.dumps(out, indent=2))
+
+
+@app.command(name="repair-relative-urls")
+def repair_relative_urls(
+    apply: bool = typer.Option(False, help="Escribe los cambios (sin --apply solo cuenta)"),
+) -> None:
+    """Reparación única: documentos guardados con enlace relativo ('/article/x') antes de que el conector los
+    resolviera. Los duplicados con la URL absoluta ya reingestada se fusionan moviendo sus relaciones."""
+    from .pipeline import repair_relative_urls as _repair
+
+    typer.echo(json.dumps(_repair(get_db(), apply=apply), ensure_ascii=False, indent=2))
 
 
 @app.command(name="verify-feeds")

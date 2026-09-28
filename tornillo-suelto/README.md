@@ -16,7 +16,7 @@
 | | **PRIMARIAS** | Flujo de documentos oficiales (BOE, BCE, Fed, Casa Blanca, ONU, OMS, BoE, BoJ, Bundesregierung…) y DIFF entre dos versiones o comunicados. |
 | | **MERCADOS** | Cinta de índices, divisas, materias primas y tipos; qué descuentan los mercados de predicción; canales causales. Sin asesoramiento financiero. |
 | | **PAÍSES / ACTORES** | Fichas por país con «¿Qué ha cambiado?», prensa local frente a extranjera; entidades con menciones fechadas y afirmaciones atribuidas. |
-| PENSADOR | **ÁGORA** | Mapas argumentales (la RBU viene sembrada: Van Parijs, Atkinson, Hayek, Rawls y la evidencia empírica), genealogía de la libertad, lentes y tutor socrático. |
+| PENSADOR | **ÁGORA** | Mapas argumentales (la RBU viene sembrada: Van Parijs, Atkinson, Hayek, Rawls y la evidencia empírica), genealogía de la libertad; con clave de API, lentes filosóficas y tutor socrático. |
 | | **ARCHIVO** | 81 casos históricos codificados (crisis de deuda, hiperinflaciones, sanciones, golpes, revoluciones, pandemias, referendos, altos el fuego, shocks) y búsqueda de análogos. |
 | | **PRONÓSTICOS** | Ciclo completo: pregunta con criterio de resolución, tu probabilidad antes que la del sistema, mercado enlazado, resolución, Brier y calibración. |
 | | **TALLER** | Notas con `[[enlaces]]` y retroenlaces, tarjetas de repaso espaciado, exportación Markdown con tu firma. |
@@ -24,15 +24,19 @@
 | | **BRIEF** | El brief de las 07:00 con cuotas por sección, hechos con cita, divergencia narrativa, primaria, por qué importa y el concepto del grado. |
 | Transversal | **DIETA · SALA DE MÁQUINAS** | Diversidad de tu dieta informativa y puntos ciegos; salud de 300 fuentes, jobs, coste de LLM y presupuesto. |
 
-Todo lo anterior funciona **sin clave de API**. Con `ANTHROPIC_API_KEY`, la mesa de agentes (extractor, editor jefe,
-analistas, filósofo, tutor socrático, equipo rojo, superpronosticador) mejora cada pantalla y cada llamada queda
-registrada con su coste. Y sí: **Tuerca**, la gata, pasea por la pantalla.
+Todo lo anterior funciona **sin clave de API**, salvo las lentes y el tutor socrático del ÁGORA. Con
+`ANTHROPIC_API_KEY` se activan el extractor Haiku y los títulos neutros en la ingesta, y los agentes bajo demanda en
+EVENTOS (editor jefe, analista regional, filósofo, equipo rojo), PAÍSES (analista regional), ÁGORA (filósofo, tutor
+socrático), PRONÓSTICOS y SIMULADOR (superpronosticador) y BRIEF (editor jefe); el resto de pantallas no usa modelo
+todavía (detalle en `docs/PLANTEAMIENTO.md` §3). Cada llamada queda registrada con su coste. Y sí: **Tuerca**, la
+gata, pasea por la pantalla.
 
-## Arrancar en tres comandos
+## Arrancar en cuatro comandos
 
 ```bash
-make install     # crea .venv, instala backend (uv) y frontend (npm)
-make seed        # fuentes, países, casos históricos, mapa argumental, plantillas de pronóstico
+make install                                    # crea .venv, instala backend (uv) y frontend (npm)
+cp config/perfil.example.yaml config/perfil.yaml  # tu perfil (estudios, negocios de MANDO); queda fuera de git
+make seed        # fuentes, países, casos históricos, mapa argumental, plantillas de pronóstico, negocios del perfil
 make up          # compila la web y levanta todo en http://127.0.0.1:8765
 ```
 
@@ -52,7 +56,7 @@ Python ≥ 3.11 con [uv](https://docs.astral.sh/uv/), Node ≥ 20 y npm. Nada m�
 tornillo-suelto/
 ├── services/core/atlas_core/   backend: FastAPI · conectores · motores · agentes · planificador · CLI
 ├── apps/web/                   frontend: React + TypeScript + Vite (estilo Hespérides, gata incluida)
-├── config/                     fuentes.seed.yaml · feeds.yaml (199 verificados) · paises · perfil · models · budget
+├── config/                     fuentes.seed.yaml · feeds.yaml (199 verificados) · paises · perfil.example (→ perfil.yaml, fuera de git) · models · budget
 ├── prompts/runtime/            contratos de los agentes (se cargan por nombre y versión)
 ├── docs/                       PLANTEAMIENTO.md · adr/ · spec/ (especificación original) · PROGRESS.md
 ├── brand/                      guía de estilo Hespérides, logos y fuentes Noto Sans
@@ -75,5 +79,6 @@ tornillo-suelto/
 6. **Presupuesto**: tope diario configurable; al 80% se pausan las tareas no críticas.
 7. **Sin asesoramiento financiero**: nunca hay órdenes ni brókers.
 
-Más detalle: `docs/PLANTEAMIENTO.md`, `docs/adr/` y `PROGRESS.md`. Capturas de cada pantalla en `docs/capturas/`
-(`make screenshots` las regenera con la API levantada).
+Más detalle: `docs/PLANTEAMIENTO.md`, `docs/adr/` y `PROGRESS.md`. Capturas de las pantallas principales en
+`docs/capturas/` (`make screenshots` recorre 16 rutas con la API levantada y escribe `{ruta}-{tema}-1440.png`; las
+fichas de evento/actor/pronóstico, la genealogía de Ágora y las de Tuerca son capturas manuales).

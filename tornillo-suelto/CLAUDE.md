@@ -29,6 +29,9 @@ Conversación, documentación, UI y textos visibles en **español**. Código, id
 
 ## Cómo trabajar
 - `make test` y `make lint` antes de dar algo por hecho; `make ingest` para probar con datos reales.
+- Perfil: `cp config/perfil.example.yaml config/perfil.yaml` antes de `atlas seed`. `perfil.yaml` está en `.gitignore`
+  y nunca se versiona (`tests/test_extra_privacy.py` falla si git lo rastrea); la suite usa
+  `tests/fixtures/perfil.test.yaml`, no el perfil personal.
 - Un conector nuevo implementa `discover/fetch/normalize` (`connectors/base.py`) y se registra en `pipeline.py`.
 - Un motor nuevo va en `engines/`, es determinista, expone su desglose y trae un test con caso de referencia.
 - Un módulo nuevo: router en `api/`, pantalla en `apps/web/src/screens/`, entrada en la navegación del modo.

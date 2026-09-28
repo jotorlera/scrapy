@@ -111,6 +111,24 @@ export function statusKind(s: ClaimStatus | null | undefined): StatusKind {
 export const STATUS_LABEL: Record<StatusKind, string> = { confirmed: 'Confirmada', disputed: 'Disputada', denied: 'Desmentida', unverified: 'Sin verificar' }
 export const STATUS_GLYPH: Record<StatusKind, string> = { confirmed: '✓', disputed: '⚠', denied: '✕', unverified: '◌' }
 
+/* Estado de un evento (`event.status`: developing | merged). */
+export const EVENT_STATUS_LABEL: Record<string, string> = { developing: 'en curso', merged: 'fusionado' }
+export const eventStatusLabel = (s: string | null | undefined): string => (s ? (EVENT_STATUS_LABEL[s] ?? s) : '—')
+
+/* Estado de una pregunta de pronóstico. */
+export const QUESTION_STATUS_LABEL: Record<string, string> = { open: 'abierta', resolved: 'resuelta' }
+export const questionStatusLabel = (s: string | null | undefined): string => (s ? (QUESTION_STATUS_LABEL[s] ?? s) : '—')
+
+/* Tipo de alerta (`alert.kind`; el planificador emite materiality y brief). */
+export const ALERT_KIND_LABEL: Record<string, string> = {
+  materiality: 'materialidad',
+  brief: 'brief',
+  state: 'variable de estado',
+  keyword: 'palabra clave',
+  exposure: 'exposición',
+}
+export const alertKindLabel = (k: string | null | undefined): string => (k ? (ALERT_KIND_LABEL[k] ?? k) : '—')
+
 export const AXIS_LABEL: Record<string, string> = { ideology: 'Ideología', bloc: 'Bloque', lang: 'Idioma', type: 'Tipo de fuente', state: 'Relación con el Estado' }
 export const axisLabel = (k: string): string => AXIS_LABEL[k] ?? k
 
@@ -212,6 +230,7 @@ export function extractorLabel(extractedBy: string | null | undefined): string {
 
 export function titleSourceLabel(titleSource: string | null | undefined): string {
   if (titleSource === 'llm') return 'título neutro generado'
+  if (titleSource === 'llm_unverified') return 'título generado sin anclaje verificado'
   return 'titular de la fuente principal'
 }
 

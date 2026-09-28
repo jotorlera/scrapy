@@ -41,7 +41,10 @@ def countries_config() -> dict[str, Any]:
 
 @cache
 def profile_config() -> dict[str, Any]:
-    return _load("perfil.yaml")
+    """Perfil personal (config/perfil.yaml, fuera de git); si no existe, la plantilla perfil.example.yaml."""
+    if (settings.config_dir / "perfil.yaml").exists():
+        return _load("perfil.yaml")
+    return _load("perfil.example.yaml")
 
 
 @cache

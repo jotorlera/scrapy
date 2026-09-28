@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import type { CalibrationResponse, EnsembleOutput, ForecastQuestion, PredictionMarket } from '../api/types'
-import { Card, CountryChips, EmptyState, ErrorBox, ExtLink, InfoIcon, Loading, Tabs } from '../components/ui/basics'
+import { Card, CountryChips, DomainChip, EmptyState, ErrorBox, ExtLink, InfoIcon, Loading, Tabs } from '../components/ui/basics'
 import { Modal } from '../components/ui/Modal'
 import { fmt2, fmtDateTime, fmtPct, parseDate } from '../lib/format'
 import { useAsync } from '../lib/hooks'
-import { FORECASTER_LABEL } from '../lib/labels'
+import { DOMAIN_LABEL, DOMAINS, FORECASTER_LABEL, questionStatusLabel } from '../lib/labels'
 import { useStore } from '../state/store'
 import './screens.css'
 
@@ -72,7 +72,7 @@ function SeriesChart({ q }: { q: ForecastQuestion }) {
   const y = (p: number) => 10 + (1 - p) * (h - 30)
   const byF = new Map<string, typeof pts>()
   for (const p of pts) byF.set(p.forecaster, [...(byF.get(p.forecaster) ?? []), p])
-  const colors: Record<string, string> = { user: 'var(--c-accent)', system: 'var(--c-black)', market: 'var(--c-link)' }
+  const colors: Record<string, string> = { user: 'var(--c-accent)', system: 'var(--c-ink)', market: 'var(--c-link)' }
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="graph-svg" role="img" aria-label="Evolución de los pronósticos">
       {[0, 0.25, 0.5, 0.75, 1].map((p) => (
@@ -173,7 +173,7 @@ function CalibrationPanel() {
             .map((b, i) => (
               <g key={i}>
                 {b.ci && <line x1={x(b.mean_p!)} x2={x(b.mean_p!)} y1={y(b.ci[0])} y2={y(b.ci[1])} stroke="var(--c-muted)" />}
-                <circle cx={x(b.mean_p!)} cy={y(b.freq!)} r={3 + Math.min(6, b.n)} fill="var(--c-accent)" stroke="var(--c-black)">
+                <circle cx={x(b.mean_p!)} cy={y(b.freq!)} r={3 + Math.min(6, b.n)} fill="var(--c-accent)" stroke="var(--c-ink)">
                   <title>
                     {Math.round(b.lo * 100)}–{Math.round(b.hi * 100)} %: media {fmtPct(b.mean_p)} · frecuencia {fmtPct(b.freq)} · n = {b.n} · IC Wilson {b.ci ? `${fmtPct(b.ci[0])}–${fmtPct(b.ci[1])}` : '—'}
                   </title>
@@ -271,7 +271,15 @@ function NewQuestionForm({ eventId, country, onCreated, onCancel }: { eventId: s
         </label>
         <label className="field">
           Dominio
-          <input type="text" value={f.domain} onChange={(e) => setF({ ...f, domain: e.target.value })} placeholder="economy, politics…" />
+          {/* Se persiste el slug (economy, politics…), que es lo que esperan la API y los filtros; el dominio es opcional. */}
+          <select value={f.domain} onChange={(e) => setF({ ...f, domain: e.target.value })}>
+            <option value="">— sin dominio —</option>
+            {DOMAINS.map((d) => (
+              <option key={d} value={d}>
+                {DOMAIN_LABEL[d]}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="field">
           Cierre
@@ -351,9 +359,16 @@ function QuestionDetail({ id }: { id: string }) {
   }
   const resolve = async (outcome: 0 | 1) => {
     if (!window.confirm(`¿Resolver como ${outcome ? 'SÍ' : 'NO'}? Se calculan Brier y log score de todos los pronosticadores.`)) return
-    const r = await api.resolveQuestion(id, outcome)
-    toast(`Resuelta. Brier: ${Object.entries(r.scores).map(([f, s]) => `${FORECASTER_LABEL(f)} ${s.brier}`).join(' · ') || 'sin pronósticos'}`)
-    reload()
+    setBusy('resolve')
+    try {
+      const r = await api.resolveQuestion(id, outcome)
+      toast(`Resuelta. Brier: ${Object.entries(r.scores).map(([f, s]) => `${FORECASTER_LABEL(f)} ${s.brier}`).join(' · ') || 'sin pronósticos'}`)
+      reload()
+    } catch (e) {
+      toast(e instanceof ApiError ? e.userMessage : String(e), 'warn')
+    } finally {
+      setBusy(null)
+    }
   }
   const runEnsemble = async () => {
     setBusy('ensemble')
@@ -373,8 +388,8 @@ function QuestionDetail({ id }: { id: string }) {
     <div>
       <div className="row small" style={{ marginBottom: 6 }}>
         <Link to="/pronosticos">← Pronósticos</Link>
-        <span className="chip">{q.status === 'open' ? 'abierta' : 'resuelta'}</span>
-        {q.domain && <span className="chip">{q.domain}</span>}
+        <span className="chip">{questionStatusLabel(q.status)}</span>
+        {q.domain && <DomainChip domain={q.domain} />}
         <CountryChips countries={q.countries} />
         <span className="muted mono" style={{ marginLeft: 'auto' }}>
           abre {fmtDateTime(q.open_at)} · cierra {fmtDateTime(q.close_at)}
@@ -616,7 +631,7 @@ export default function Forecasts() {
               <Card key={q.id} title={<Link to={`/pronosticos/${q.id}`}>{q.title}</Link>} extra={<span className="muted small mono">cierra {fmtDateTime(q.close_at)}</span>}>
                 <ProbBars q={q} revealSystem={false} />
                 <div className="row wrap small muted" style={{ marginTop: 6 }}>
-                  {q.domain && <span className="chip">{q.domain}</span>}
+                  {q.domain && <DomainChip domain={q.domain} />}
                   <CountryChips countries={q.countries} />
                   {q.market && <span>mercado {q.market.venue}</span>}
                   {q.origin_event_id && <Link to={`/eventos/${q.origin_event_id}`}>evento origen</Link>}

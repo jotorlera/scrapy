@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections.abc import Iterator
 from typing import Any
 
@@ -13,10 +14,11 @@ from sse_starlette.sse import EventSourceResponse
 
 from .. import agents
 from ..db import loads
-from ..llm import BudgetExceeded, LLMUnavailable, get_llm
-from .deps import db
+from ..llm import BudgetExceeded, LLMRefused, LLMTruncated, LLMUnavailable, get_llm
+from .deps import DaysQ, LimitQ, db
 
 router = APIRouter()
+log = logging.getLogger(__name__)
 
 
 def _status() -> dict[str, Any]:
@@ -56,34 +58,47 @@ async def _sse(gen: Iterator[dict[str, Any]]):
             return None
 
     while True:
-        item = await loop.run_in_executor(None, _next)
+        try:
+            item = await loop.run_in_executor(None, _next)
+        except Exception as e:  # noqa: BLE001 - las cabeceras 200 ya salieron: avisar con un evento y cerrar
+            log.exception("fallo en el stream del agente")
+            yield {
+                "event": "error",
+                "data": json.dumps({"type": "error", "message": str(e)}, ensure_ascii=False),
+            }
+            break
         if item is None:
             break
         yield {"event": item.get("type", "message"), "data": json.dumps(item, ensure_ascii=False)}
 
 
+def _stream(fn, *args) -> EventSourceResponse:
+    _require()
+    try:
+        gen = fn(db(), *args)  # event_context() se evalúa aquí, antes de enviar cabeceras: 404 limpio
+    except KeyError as e:
+        raise HTTPException(404, str(e)) from e
+    return EventSourceResponse(_sse(gen))
+
+
 @router.get("/agents/deepen/{event_id}")
 async def deepen(event_id: str):
-    _require()
-    return EventSourceResponse(_sse(agents.deepen(db(), event_id)))
+    return _stream(agents.deepen, event_id)
 
 
 @router.get("/agents/explain/{event_id}")
 async def explain(event_id: str):
-    _require()
-    return EventSourceResponse(_sse(agents.explain_60s(db(), event_id)))
+    return _stream(agents.explain_60s, event_id)
 
 
 @router.get("/agents/lens")
 async def lens(tradition: str, event_id: str | None = None, text: str | None = None):
-    _require()
-    return EventSourceResponse(_sse(agents.lens(db(), event_id, tradition, text)))
+    return _stream(agents.lens, event_id, tradition, text)
 
 
 @router.get("/agents/country_changes/{iso2}")
-async def country_changes(iso2: str, days: int = 7):
-    _require()
-    return EventSourceResponse(_sse(agents.what_changed_country(db(), iso2.upper(), days)))
+async def country_changes(iso2: str, days: DaysQ = 7):
+    return _stream(agents.what_changed_country, iso2.upper(), days)
 
 
 class SocraticIn(BaseModel):
@@ -94,13 +109,12 @@ class SocraticIn(BaseModel):
 
 @router.post("/agents/socratic")
 async def socratic(body: SocraticIn):
-    _require()
     history = [
         {"role": h["role"], "content": h["content"]}
         for h in body.history
         if h.get("role") in ("user", "assistant") and h.get("content")
     ]
-    return EventSourceResponse(_sse(agents.socratic(db(), body.mode, body.message, history)))
+    return _stream(agents.socratic, body.mode, body.message, history)
 
 
 def _structured(fn, *args):
@@ -109,6 +123,12 @@ def _structured(fn, *args):
         return fn(db(), *args)
     except (LLMUnavailable, BudgetExceeded) as e:
         raise HTTPException(429, str(e)) from e
+    except LLMRefused as e:
+        raise HTTPException(422, {"message": "El modelo declinó la petición", "detail": str(e)}) from e
+    except (LLMTruncated, ValueError) as e:
+        raise HTTPException(
+            502, {"message": "Salida del modelo cortada o no válida", "detail": str(e)}
+        ) from e
     except KeyError as e:
         raise HTTPException(404, str(e)) from e
 
@@ -150,7 +170,7 @@ def title(event_id: str) -> dict[str, Any]:
 
 
 @router.get("/agents/runs")
-def runs(kind: str | None = None, ref: str | None = None, limit: int = 30) -> dict[str, Any]:
+def runs(kind: str | None = None, ref: str | None = None, limit: LimitQ = 30) -> dict[str, Any]:
     d = db()
     sql = "SELECT * FROM agent_run WHERE 1=1"
     params: list[Any] = []

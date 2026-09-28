@@ -104,8 +104,9 @@ textarea {
 
 :focus-visible {
   outline: 2px solid var(--c-accent);
-  outline-offset: 0;
-  box-shadow: 0 0 0 1px var(--c-black);
+  outline-offset: 1px;
+  /* Anillo de tinta de 1 px pegado al borde (21:1 en claro, ~17:1 en oscuro); el amarillo queda fuera y no lo tapa. */
+  box-shadow: 0 0 0 1px var(--c-ink);
 }
 
 ::selection {
@@ -302,7 +303,7 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--c-black);
+  border-color: var(--c-ink);
 }
 textarea {
   resize: vertical;
@@ -366,7 +367,7 @@ label.field > textarea {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--c-muted);
-  border-bottom: 1px solid var(--c-black);
+  border-bottom: 1px solid var(--c-ink);
   white-space: nowrap;
   position: sticky;
   top: 0;
@@ -408,7 +409,7 @@ label.field > textarea {
 .bar > i {
   display: block;
   height: 100%;
-  background: var(--c-black);
+  background: var(--c-ink);
 }
 .bar.accent > i {
   background: var(--c-accent);

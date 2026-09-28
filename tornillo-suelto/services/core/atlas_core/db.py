@@ -12,7 +12,7 @@ import threading
 import uuid
 from collections.abc import Iterable
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +53,7 @@ CREATE INDEX IF NOT EXISTS ix_document_published ON document(published_at DESC);
 CREATE INDEX IF NOT EXISTS ix_document_source ON document(source_id, published_at DESC);
 CREATE INDEX IF NOT EXISTS ix_document_event ON document(event_id);
 CREATE INDEX IF NOT EXISTS ix_document_hash ON document(content_hash);
+CREATE INDEX IF NOT EXISTS ix_document_canonical ON document(canonical_url);
 CREATE VIRTUAL TABLE IF NOT EXISTS document_fts USING fts5(doc_id UNINDEXED, title, lede, text, tokenize='unicode61 remove_diacritics 2');
 
 CREATE TABLE IF NOT EXISTS entity (
@@ -210,6 +211,17 @@ CREATE TABLE IF NOT EXISTS setting (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
 def now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat()
+
+
+def since_iso(hours: float = 0, days: float = 0) -> str:
+    """Umbral temporal con el MISMO formato que now_iso()/to_iso() ('YYYY-MM-DDTHH:MM:SS+00:00').
+
+    Las columnas de fecha se comparan como cadenas y la función `datetime` de SQLite devuelve
+    'YYYY-MM-DD HH:MM:SS' (espacio): como 'T' > ' ', cualquier fila del mismo día natural pasaba el filtro
+    (ventanas de hasta 24 h de más). Pasar siempre el umbral como parámetro: `col >= ?` con `since_iso(hours=24)`,
+    nunca la hora calculada por SQLite.
+    """
+    return (datetime.now(UTC) - timedelta(hours=hours, days=days)).replace(microsecond=0).isoformat()
 
 
 def new_id() -> str:

@@ -80,25 +80,31 @@ La especificación pedía tema oscuro con Inter/JetBrains; el usuario pide ahora
 
 ## 3. Qué se construye ahora (y qué se deja preparado)
 
-| Módulo | Estado en esta entrega | Motor | Con clave de API añade |
-|---|---|---|---|
-| RADAR | Completo | clustering, materialidad, deltas | títulos neutros generados |
-| EVENTOS | Completo (afirmaciones, fuentes, cronología, contexto, pronósticos) | extractor heurístico + cite-or-drop | extractor Haiku, «Profundiza» con streaming, dossier |
-| PRISMA | Completo (matriz, silencio, léxico diferencial) | Poisson estandarizado + Monroe log-odds | familias de marcos (Entman) |
-| PRIMARIAS | Completo (flujo oficial + DIFF) | difflib + normalización | resumen semántico del diff |
-| ECONOMÍA / MERCADOS | Cinta, canales causales, «qué está descontado» (mercados de predicción) | APIs públicas | debate alcista/bajista sin órdenes |
-| GEOPOLÍTICA / PAÍSES | Fichas por país con «¿Qué ha cambiado?» y miniPRISMA | deltas y cobertura | narrativa del cambio |
-| ACTORES | Entidades del gazetteer y menciones fechadas | gazetteer | posiciones y contradicciones |
-| ÁGORA | Mapa argumental (RBU sembrado), genealogía de la libertad | editor SVG propio | lentes, traductor normativo, tutor socrático |
-| ARCHIVO | 60 casos codificados con análogos por similitud | embeddings locales | tabla de similitudes/diferencias |
-| PRONÓSTICOS | Ciclo completo: crear, pronosticar (usuario antes que sistema), mercado, resolver, Brier, calibración | matemática de docs/06 | ensemble de 5 + agregador |
-| TALLER | Notas con `[[enlaces]]`, retroenlaces, tarjetas de repaso (FSRS-lite), exportación Markdown | — | tarjetas generadas |
-| MANDO | Negocios del perfil, exposición por canal, diario de decisiones con pre-mortem | reglas por jurisdicción/sector/palabra clave | valoración de exposición |
-| DIETA | Entropía por ideología, región, idioma y tipo; puntos ciegos | registro local de lectura | steelman del marco menos leído |
-| BRIEF | Selección por materialidad con cuotas, pregunta de pronóstico y cuestión socrática | determinista | redacción editorial |
-| SALA DE MÁQUINAS | Salud de conectores, jobs, coste LLM, presupuesto | — | — |
-| SIMULADOR | Modo C («¿qué pasa si…?») preparado; A y B fuera de alcance | — | escenarios + equipo rojo |
-| App macOS (Tauri) | Fuera de alcance de esta entrega (ADR-0002) | — | — |
+La columna «Estado con clave» dice qué existe de verdad en el código: **implementado** = hay agente y endpoint en
+`api/routes_agents.py`; **pendiente** = solo hay, como mucho, el prompt en `prompts/runtime/` (sin agente ni
+endpoint), así que añadir `ANTHROPIC_API_KEY` no cambia nada en esa pantalla. `tests/test_extra_prompts.py` vigila
+que la mesa cableada (extractor, editor_jefe, analista_regional, filosofo, tutor_socratico, equipo_rojo,
+superpronosticador) coincida con esta tabla.
+
+| Módulo | Estado en esta entrega | Motor | Con clave de API añade | Estado con clave |
+|---|---|---|---|---|
+| RADAR | Completo | clustering, materialidad, deltas | títulos neutros generados | implementado (extractor, en la ingesta) |
+| EVENTOS | Completo (afirmaciones, fuentes, cronología, contexto, pronósticos) | extractor heurístico + cite-or-drop | extractor Haiku, «Profundiza» con streaming, explícamelo, dossier | implementado (extractor, editor_jefe, analista_regional) |
+| PRISMA | Completo (matriz, silencio, léxico diferencial) | Poisson estandarizado + Monroe log-odds | familias de marcos (Entman) | **pendiente** (prompt `clasificador_marcos` escrito; sin agente ni endpoint: `frames: []`) |
+| PRIMARIAS | Completo (flujo oficial + DIFF) | difflib + normalización | resumen semántico del diff | **pendiente** (sin agente ni endpoint) |
+| ECONOMÍA / MERCADOS | Cinta, canales causales, «qué está descontado» (mercados de predicción) | APIs públicas | debate alcista/bajista sin órdenes | **pendiente** (prompt `estratega_mercados` escrito; sin agente ni endpoint) |
+| GEOPOLÍTICA / PAÍSES | Fichas por país con «¿Qué ha cambiado?» y miniPRISMA | deltas y cobertura | narrativa del cambio | implementado (analista_regional) |
+| ACTORES | Entidades del gazetteer y menciones fechadas | gazetteer | posiciones y contradicciones | **pendiente** (sin agente ni endpoint) |
+| ÁGORA | Mapa argumental (RBU sembrado), genealogía de la libertad | editor SVG propio | lentes, traductor normativo, tutor socrático | implementado (filosofo, tutor_socratico) |
+| ARCHIVO | 60 casos codificados con análogos por similitud | embeddings locales | tabla de similitudes/diferencias | **pendiente** (prompt `historiador` escrito; sin agente ni endpoint) |
+| PRONÓSTICOS | Ciclo completo: crear, pronosticar (usuario antes que sistema), mercado, resolver, Brier, calibración | matemática de docs/06 | ensemble de 5 + agregador | implementado (superpronosticador) |
+| TALLER | Notas con `[[enlaces]]`, retroenlaces, tarjetas de repaso (FSRS-lite), exportación Markdown | — | tarjetas generadas | **pendiente** (sin agente ni endpoint) |
+| MANDO | Negocios del perfil, exposición por canal, diario de decisiones con pre-mortem | reglas por jurisdicción/sector/palabra clave | valoración de exposición | **pendiente** (prompt `estratega_corporativo` escrito; sin agente ni endpoint) |
+| DIETA | Entropía por ideología, región, idioma y tipo; puntos ciegos | registro local de lectura | steelman del marco menos leído | **pendiente** (sin agente ni endpoint) |
+| BRIEF | Selección por materialidad con cuotas, pregunta de pronóstico y cuestión socrática | determinista | redacción editorial | implementado (editor_jefe) |
+| SALA DE MÁQUINAS | Salud de conectores, jobs, coste LLM, presupuesto | — | — | — |
+| SIMULADOR | Modo C («¿qué pasa si…?») preparado; A y B fuera de alcance | — | escenarios + equipo rojo | implementado (superpronosticador, equipo_rojo) |
+| App macOS (Tauri) | Fuera de alcance de esta entrega (ADR-0002) | — | — | — |
 
 ## 4. Contratos que no se negocian
 

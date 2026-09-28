@@ -60,7 +60,7 @@ function CausalGraph({ channels }: { channels: CausalChannel[] }) {
     <svg className="graph-svg" viewBox={`0 0 ${layout.width} ${layout.height}`} role="img" aria-label="Grafo de canales causales">
       <defs>
         <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-          <path d="M0,0 L10,5 L0,10 z" fill="var(--c-black)" />
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--c-ink)" />
         </marker>
         <marker id="arrow-neg" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" fill="var(--c-warn)" />

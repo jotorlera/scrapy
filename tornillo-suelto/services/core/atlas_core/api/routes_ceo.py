@@ -3,19 +3,19 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ..config_loader import profile_config
-from ..db import dumps, loads, new_id, now_iso
+from ..db import dumps, loads, new_id, now_iso, since_iso
 from ..engines.brief import compose_brief
 from ..engines.diet import diet_report
 from ..engines.exposure import EU_MEMBERS
 from ..llm import get_llm
 from ..pipeline import recompute_events, run_ingest, run_markets
-from .deps import db, doc_out, event_out
+from .deps import DaysQ, HoursQ, LimitQ, db, doc_out, event_out
 
 router = APIRouter()
 
@@ -31,8 +31,8 @@ def mando() -> dict[str, Any]:
         for f in ("sectors", "jurisdictions", "markets", "currencies", "regulations", "keywords"):
             x[f] = loads(x[f], [])
         x["alerts_7d"] = d.scalar(
-            "SELECT COUNT(*) FROM exposure_alert WHERE business_id = ? AND dismissed = 0 AND created_at >= datetime('now','-7 days')",
-            (x["id"],),
+            "SELECT COUNT(*) FROM exposure_alert WHERE business_id = ? AND dismissed = 0 AND created_at >= ?",
+            (x["id"], since_iso(days=7)),
             0,
         )
         businesses.append(x)
@@ -66,8 +66,8 @@ def mando() -> dict[str, Any]:
         marks = ",".join("?" for _ in countries)
         rows = d.all(
             f"""SELECT d.*, s.name AS source_name, s.country AS source_country, s.type AS source_type FROM document d JOIN source s ON s.id = d.source_id
-                WHERE s.tier = 1 AND (s.country IN ({marks}) OR s.country = 'EU') AND d.fetched_at >= datetime('now','-14 days') ORDER BY d.published_at DESC LIMIT 300""",
-            list(countries),
+                WHERE s.tier = 1 AND (s.country IN ({marks}) OR s.country = 'EU') AND d.fetched_at >= ? ORDER BY d.published_at DESC LIMIT 300""",
+            [*countries, since_iso(days=14)],
         )
         from ..embed import normalize_text
 
@@ -108,6 +108,8 @@ def mando() -> dict[str, Any]:
 @router.post("/mando/alerts/{alert_id}/dismiss")
 def dismiss_alert(alert_id: str) -> dict[str, Any]:
     d = db()
+    if not d.one("SELECT 1 FROM exposure_alert WHERE id = ?", (alert_id,)):
+        raise HTTPException(404, "alerta no encontrada")
     with d.tx() as conn:
         conn.execute("UPDATE exposure_alert SET dismissed = 1 WHERE id = ?", (alert_id,))
     return {"ok": True}
@@ -156,6 +158,8 @@ class DecisionOutcome(BaseModel):
 @router.post("/mando/decisions/{decision_id}/outcome")
 def decision_outcome(decision_id: str, body: DecisionOutcome) -> dict[str, Any]:
     d = db()
+    if not d.one("SELECT 1 FROM decision_log WHERE id = ?", (decision_id,)):
+        raise HTTPException(404, "decisión no encontrada")
     d.update("decision_log", decision_id, {"outcome": body.outcome, "lessons": body.lessons})
     return {"ok": True}
 
@@ -195,7 +199,7 @@ def diet_log(body: LogIn) -> dict[str, Any]:
 
 
 @router.get("/diet/report")
-def diet(days: int = 7) -> dict[str, Any]:
+def diet(days: DaysQ = 7) -> dict[str, Any]:
     return diet_report(db(), days=days)
 
 
@@ -235,7 +239,7 @@ def brief_get(brief_id: str) -> dict[str, Any]:
 
 
 @router.post("/brief/generate")
-def brief_generate(kind: str = "study", hours: int = 24) -> dict[str, Any]:
+def brief_generate(kind: str = "study", hours: HoursQ = 24) -> dict[str, Any]:
     return {"brief": compose_brief(db(), kind=kind, hours=hours)}
 
 
@@ -245,12 +249,14 @@ def brief_generate(kind: str = "study", hours: int = 24) -> dict[str, Any]:
 @router.get("/machine")
 def machine() -> dict[str, Any]:
     d = db()
+    since_24h = since_iso(hours=24)
     sources = [
         dict(r)
         for r in d.all(
             """SELECT id, slug, name, tier, type, country, region_bloc, active, feeds, feed_status, poll_minutes, last_polled_at, last_ok_at, last_error, last_items,
-                  (SELECT COUNT(*) FROM document WHERE document.source_id = source.id AND fetched_at >= datetime('now','-1 day')) AS docs_24h
-           FROM source ORDER BY active DESC, tier, name"""
+                  (SELECT COUNT(*) FROM document WHERE document.source_id = source.id AND fetched_at >= ?) AS docs_24h
+           FROM source ORDER BY active DESC, tier, name""",
+            (since_24h,),
         )
     ]
     for s in sources:
@@ -277,9 +283,7 @@ def machine() -> dict[str, Any]:
         "sources_with_feed": sum(1 for s in sources if s["feeds"]),
         "sources_ok_24h": sum(1 for s in sources if s["last_ok_at"] and s["last_ok_at"] >= (now_iso()[:10])),
         "documents": d.scalar("SELECT COUNT(*) FROM document", (), 0),
-        "documents_24h": d.scalar(
-            "SELECT COUNT(*) FROM document WHERE fetched_at >= datetime('now','-1 day')", (), 0
-        ),
+        "documents_24h": d.scalar("SELECT COUNT(*) FROM document WHERE fetched_at >= ?", (since_24h,), 0),
         "events": d.scalar("SELECT COUNT(*) FROM event WHERE status != 'merged'", (), 0),
         "claims": d.scalar("SELECT COUNT(*) FROM claim", (), 0),
         "claims_confirmed": d.scalar("SELECT COUNT(*) FROM claim WHERE status = 'confirmed'", (), 0),
@@ -313,7 +317,7 @@ async def _bg(job: str, coro) -> None:
 
 @router.post("/machine/ingest")
 async def trigger_ingest(
-    background: BackgroundTasks, force: bool = False, limit: int | None = None
+    background: BackgroundTasks, force: bool = False, limit: Annotated[int | None, Query(ge=1)] = None
 ) -> dict[str, Any]:
     if _running.get("ingest"):
         return {"started": False, "reason": "ya hay una ingesta en curso"}
@@ -330,7 +334,7 @@ async def trigger_markets(background: BackgroundTasks) -> dict[str, Any]:
 
 
 @router.post("/machine/recompute")
-def trigger_recompute(hours: int = 72) -> dict[str, Any]:
+def trigger_recompute(hours: HoursQ = 72) -> dict[str, Any]:
     return recompute_events(db(), hours=hours)
 
 
@@ -362,7 +366,8 @@ def alerts() -> dict[str, Any]:
     high = [
         event_out(r)
         for r in d.all(
-            "SELECT * FROM event WHERE materiality >= 80 AND last_update_at >= datetime('now','-1 day') ORDER BY materiality DESC LIMIT 10"
+            "SELECT * FROM event WHERE materiality >= 80 AND last_update_at >= ? ORDER BY materiality DESC LIMIT 10",
+            (since_iso(hours=24),),
         )
     ]
     return {"alerts": rows, "high_materiality": high, "unread": sum(1 for r in rows if not r["read"])}
@@ -404,7 +409,7 @@ def put_settings(body: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.get("/search")
-def search(q: str, limit: int = 8) -> dict[str, Any]:
+def search(q: str, limit: LimitQ = 8) -> dict[str, Any]:
     d = db()
     q = q.strip()
     if not q:

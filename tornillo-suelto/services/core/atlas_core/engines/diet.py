@@ -36,7 +36,7 @@ def diet_report(db: Database, days: int = 7, blind_spot_minutes: float = 5.0) ->
     axes: dict[str, dict[str, float]] = {a: defaultdict(float) for a in AXES}
     total_seconds = 0.0
     for r in logs:
-        secs = float(r.get("seconds") or 0) or (30.0 if r.get("action") == "open" else 0.0)
+        secs = float(r.get("seconds") or 0)
         total_seconds += secs
         for axis, col in AXES.items():
             axes[axis][r.get(col) or "unknown"] += secs
@@ -47,7 +47,7 @@ def diet_report(db: Database, days: int = 7, blind_spot_minutes: float = 5.0) ->
     for r in logs:
         if not r.get("topic"):
             continue
-        secs = float(r.get("seconds") or 0) or 30.0
+        secs = float(r.get("seconds") or 0)
         by_topic[r["topic"]][r.get("ideology_label") or "unknown"] += secs
     blind = []
     for topic, dist in by_topic.items():

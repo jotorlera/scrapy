@@ -150,7 +150,7 @@ function NormativeView({ r }: { r: NormativeTranslation }) {
   )
 }
 
-function QuickNote() {
+function QuickNote({ inert = false }: { inert?: boolean }) {
   const { currentEvent, toast } = useStore()
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
@@ -169,7 +169,7 @@ function QuickNote() {
     }
   }
   return (
-    <div className="quick-note">
+    <div className="quick-note" inert={inert}>
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <span className="label">Nota rápida</span>
         {currentEvent && (
@@ -237,35 +237,37 @@ export function ContextPanel() {
     body = <div className="muted small">Aquí aparecen el detalle de la selección, la salida de los agentes en streaming y los documentos citados. Selecciona un evento o una afirmación.</div>
   }
 
-  if (!panelOpen) {
-    return (
-      <aside className="panel closed" aria-label="Panel contextual plegado">
-        <div className="panel-head">
+  /* Un único <aside> en ambos estados, con los mismos hijos en las mismas posiciones: al plegar, el cuerpo
+     y la nota se ocultan por CSS (.panel.closed) y quedan inertes, pero no se desmontan. Así AgentStream no
+     cierra el stream ni relanza (y cobra) el agente al volver a abrir, y DocumentView no recarga. */
+  return (
+    <aside className={panelOpen ? 'panel' : 'panel closed'} aria-label={panelOpen ? 'Panel contextual' : 'Panel contextual plegado'}>
+      <div className="panel-head">
+        {panelOpen ? (
+          <>
+            <span className="label">{title}</span>
+            <span className="row" style={{ gap: 2 }}>
+              {panel && (
+                <button type="button" className="btn-icon" onClick={() => setPanel(null)} aria-label="Limpiar el panel" title="Limpiar">
+                  ✕
+                </button>
+              )}
+              <button type="button" className="btn-icon" onClick={() => setPanelOpen(false)} aria-label="Plegar el panel contextual" title="Plegar">
+                ▸
+              </button>
+            </span>
+          </>
+        ) : (
           <button type="button" className="btn-icon" onClick={() => setPanelOpen(true)} aria-label="Abrir el panel contextual" title="Abrir panel">
             ◂
           </button>
-        </div>
-        <div className="vertical-label">Panel</div>
-      </aside>
-    )
-  }
-  return (
-    <aside className="panel" aria-label="Panel contextual">
-      <div className="panel-head">
-        <span className="label">{title}</span>
-        <span className="row" style={{ gap: 2 }}>
-          {panel && (
-            <button type="button" className="btn-icon" onClick={() => setPanel(null)} aria-label="Limpiar el panel" title="Limpiar">
-              ✕
-            </button>
-          )}
-          <button type="button" className="btn-icon" onClick={() => setPanelOpen(false)} aria-label="Plegar el panel contextual" title="Plegar">
-            ▸
-          </button>
-        </span>
+        )}
       </div>
-      <div className="panel-body">{body}</div>
-      <QuickNote />
+      <div className="panel-body" inert={!panelOpen} aria-hidden={!panelOpen}>
+        {body}
+      </div>
+      <QuickNote inert={!panelOpen} />
+      {!panelOpen && <div className="vertical-label">Panel</div>}
     </aside>
   )
 }

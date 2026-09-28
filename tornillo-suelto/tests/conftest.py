@@ -2,15 +2,42 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
 sys.path.insert(0, str(ROOT / "services" / "core"))
 os.environ.setdefault("ATLAS_SCHEDULER", "0")
 
 from atlas_core.db import Database, set_db  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def test_profile(monkeypatch: pytest.MonkeyPatch):
+    """La suite nunca depende de config/perfil.yaml (personal, fuera de git).
+
+    Redirige la lectura de `perfil.yaml` en config_loader a tests/fixtures/perfil.test.yaml (4 negocios ficticios).
+    Se parchea `_load`, no `profile_config`, porque seed.py y scheduler.py importan `profile_config` por nombre;
+    las cachés se vacían antes y después para que ningún test vea el perfil real ni el de otro test.
+    """
+    from atlas_core import config_loader
+
+    real_load = config_loader._load
+
+    def _load(name: str):
+        if name == "perfil.yaml":
+            with (FIXTURES / "perfil.test.yaml").open(encoding="utf-8") as fh:
+                return yaml.safe_load(fh) or {}
+        return real_load(name)
+
+    config_loader.clear_caches()
+    monkeypatch.setattr(config_loader, "_load", _load)
+    yield
+    config_loader.clear_caches()
 
 
 @pytest.fixture()
@@ -27,6 +54,15 @@ def seeded(db: Database) -> Database:
 
     seed_all(db)
     return db
+
+
+def iso_ago(hours: float = 0, days: float = 0) -> str:
+    """Timestamp ISO en el formato de now_iso() ('YYYY-MM-DDTHH:MM:SS+00:00') desplazado hacia atrás.
+
+    Úsalo para sembrar documentos/eventos/alertas con fecha distinta de «ahora»: las ventanas temporales
+    (radar, MANDO, Sala de Máquinas, planificador) solo se prueban de verdad con filas fuera de la ventana.
+    """
+    return (datetime.now(UTC) - timedelta(hours=hours, days=days)).replace(microsecond=0).isoformat()
 
 
 def make_source(db: Database, slug: str, **kw) -> str:

@@ -16,3 +16,5 @@ apps/web/dist/
 references/
 *.egg-info/
 data/*.lock
+# Perfil personal (nombre, estudios, negocios): nunca versionado. Plantilla en config/perfil.example.yaml
+config/perfil.yaml

@@ -14,7 +14,7 @@ from typing import Any
 
 import numpy as np
 
-from ..db import Database, blob_to_vec, dumps, loads, new_id, now_iso, vec_to_blob
+from ..db import Database, blob_to_vec, dumps, loads, new_id, now_iso, since_iso, vec_to_blob
 from ..embed import DIM, get_embedder
 from ..gazetteer import countries
 from ..util import parse_iso
@@ -273,8 +273,8 @@ def consolidate_events(db: Database, hours: int = 48) -> dict[str, int]:
     theta = THETA_BY_MODEL.get(model, 0.5) + MERGE_THETA_EXTRA
     rows = db.all(
         """SELECT id, centroid, n_docs, entity_keys, last_update_at, first_seen_at, countries FROM event
-           WHERE status != 'merged' AND embedding_model = ? AND last_update_at >= datetime('now', ?) ORDER BY n_docs DESC""",
-        (model, f"-{hours} hours"),
+           WHERE status != 'merged' AND embedding_model = ? AND last_update_at >= ? ORDER BY n_docs DESC""",
+        (model, since_iso(hours=hours)),
     )
     evs = []
     for r in rows:

@@ -4,6 +4,7 @@ import { api } from '../../api/client'
 import type { AlertsResponse, Mode } from '../../api/types'
 import { fmtAgo } from '../../lib/format'
 import { useInterval } from '../../lib/hooks'
+import { alertKindLabel } from '../../lib/labels'
 import { MODE_NAV, useStore } from '../../state/store'
 import { Brand } from './Brand'
 
@@ -126,7 +127,7 @@ export function Header() {
             {alerts?.alerts.map((a) => (
               <div key={a.id} className={`item ${a.read ? '' : 'unread'}`}>
                 <div className="row" style={{ justifyContent: 'space-between' }}>
-                  <span className="label">{a.kind}</span>
+                  <span className="label">{alertKindLabel(a.kind)}</span>
                   <span className="muted mono">{fmtAgo(a.created_at)}</span>
                 </div>
                 <div>

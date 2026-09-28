@@ -52,7 +52,7 @@ export interface MaterialityBreakdown {
 export interface EventSummary {
   id: string
   title_neutral: string
-  title_source: 'lead_document' | 'llm' | string
+  title_source: 'lead_document' | 'llm' | 'llm_unverified' | string
   summary: string | null
   domain: Domain | string | null
   countries: string[]

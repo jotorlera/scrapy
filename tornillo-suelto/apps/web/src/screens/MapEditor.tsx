@@ -221,7 +221,7 @@ export default function MapEditor() {
           <svg ref={svgRef} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp} onMouseDown={onBgDown} onWheel={onWheel} role="application" aria-label="Lienzo del mapa argumental">
             <defs>
               <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-                <path d="M0,0 L10,5 L0,10 z" fill="var(--c-black)" />
+                <path d="M0,0 L10,5 L0,10 z" fill="var(--c-ink)" />
               </marker>
               <marker id="arr-att" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
                 <path d="M0,0 L10,5 L0,10 z" fill="var(--c-warn)" />

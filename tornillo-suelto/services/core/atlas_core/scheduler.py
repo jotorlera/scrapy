@@ -8,7 +8,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from .config_loader import profile_config
-from .db import Database, dumps, new_id, now_iso
+from .db import Database, dumps, new_id, now_iso, since_iso
 from .engines.brief import compose_brief
 from .pipeline import recompute_events, run_ingest, run_markets
 from .settings import settings
@@ -68,9 +68,7 @@ class Scheduler:
         if self.db.one("SELECT 1 FROM brief WHERE date = ? AND kind = 'study'", (today,)):
             return
         if (
-            self.db.scalar(
-                "SELECT COUNT(*) FROM event WHERE last_update_at >= datetime('now','-1 day')", (), 0
-            )
+            self.db.scalar("SELECT COUNT(*) FROM event WHERE last_update_at >= ?", (since_iso(days=1),), 0)
             < 5
         ):
             return
@@ -107,8 +105,8 @@ class Scheduler:
 
         th = float((materiality_config().get("thresholds") or {}).get("push_alert", 80))
         rows = self.db.all(
-            "SELECT id, title_neutral, materiality FROM event WHERE materiality >= ? AND last_update_at >= datetime('now','-1 day')",
-            (th,),
+            "SELECT id, title_neutral, materiality FROM event WHERE materiality >= ? AND last_update_at >= ?",
+            (th, since_iso(days=1)),
         )
         with self.db.tx() as conn:
             for r in rows:

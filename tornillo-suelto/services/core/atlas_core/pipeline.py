@@ -9,17 +9,23 @@ Con clave de API y presupuesto: extractor Haiku para las fuentes de tier ≤ 3 y
 from __future__ import annotations
 
 import asyncio
+import fcntl
+import logging
+import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 from .connectors.base import make_client
 from .connectors.markets import refresh_markets
 from .connectors.prediction_markets import refresh_prediction_markets
-from .connectors.rss import RSSConnector
-from .db import Database, dumps, loads, new_id, now_iso, row_to_dict, vec_to_blob
+from .connectors.rss import RSSConnector, resolve_link
+from .db import Database, dumps, loads, new_id, now_iso, row_to_dict, since_iso, vec_to_blob
 from .embed import IDF, get_embedder, set_idf
-from .engines.claims import heuristic_claims, persist_claims
+from .engines.claims import compute_status, heuristic_claims, persist_claims
 from .engines.cluster import ClusterIndex, consolidate_events
 from .engines.coverage import baseline_shares, compute_coverage
 from .engines.exposure import evaluate_event
@@ -33,10 +39,54 @@ from .gazetteer import (
     topics_from_mentions,
 )
 from .settings import settings
-from .util import parse_iso
+from .util import canonicalize_url, parse_iso
+
+log = logging.getLogger("atlas.pipeline")
 
 MAX_ITEMS_PER_SOURCE_PER_RUN = 60
 MAX_ITEMS_BULLETIN = 40  # boletines oficiales y agencias muy prolíficas
+# published_at no puede ser posterior a la descarga: tolerancia de reloj antes de acotarlo
+PUBLISHED_AT_SKEW = timedelta(minutes=15)
+BUSY_REASON = "otra pasada en curso"
+
+
+class JobBusy(Exception):
+    """Ya hay una pasada de ingesta/recálculo sobre esta base de datos (otro hilo u otro proceso)."""
+
+
+_memory_locks: dict[str, threading.Lock] = {}
+
+
+@contextmanager
+def job_lock(db: Database, job: str = "ingest") -> Iterator[None]:
+    """Exclusión mutua entre hilos Y procesos para las pasadas que escriben eventos (ingesta y recálculo).
+
+    `flock` sobre `<db>.<job>.lock`: el cerrojo va ligado a la descripción de fichero abierta, así que dos
+    hilos del mismo proceso (planificador vs API) o dos procesos (`atlas ingest` vs servidor) sobre el mismo
+    atlas.db se excluyen igual. Sin él, dos `process_new_documents` a la vez ven los mismos documentos sin evento
+    y cada uno crea sus propios eventos y afirmaciones (eventos gemelos, afirmaciones duplicadas). No bloquea:
+    si el cerrojo está ocupado lanza JobBusy y el llamador devuelve {'started': False, ...}.
+    """
+    if str(db.path) == ":memory:":
+        lock = _memory_locks.setdefault(job, threading.Lock())
+        if not lock.acquire(blocking=False):
+            raise JobBusy(job)
+        try:
+            yield
+        finally:
+            lock.release()
+        return
+    path = Path(f"{db.path}.{job}.lock")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fh = path.open("a+")
+    try:
+        try:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            raise JobBusy(job) from None
+        yield
+    finally:
+        fh.close()  # cerrar el descriptor libera el flock
 
 
 def _job_start(db: Database, job: str) -> int:
@@ -71,8 +121,47 @@ def due_sources(db: Database, force: bool = False, limit: int | None = None) -> 
     return out
 
 
+def _record_health(
+    db: Database,
+    src: dict[str, Any],
+    ts: str,
+    ok: bool,
+    n_items: int,
+    error: str | None,
+    latency_ms: int | None,
+    etag: str | None = None,
+    last_modified: str | None = None,
+) -> None:
+    """Fila en source_health Y actualización de `source`: `last_polled_at` se fija siempre (también al fallar),
+    si no la fuente rota sigue siendo «due» y se reintenta en cada ciclo."""
+    with db.tx() as c:
+        c.execute(
+            "INSERT INTO source_health(source_id, checked_at, ok, items, error, latency_ms) VALUES (?,?,?,?,?,?)",
+            (src["id"], ts, 1 if ok else 0, n_items, error, latency_ms),
+        )
+        fields: dict[str, Any] = {"last_polled_at": ts, "last_error": error}
+        if ok:
+            fields.update({"last_ok_at": ts, "last_items": n_items})
+            if etag:
+                fields["etag"] = etag
+            if last_modified:
+                fields["last_modified"] = last_modified
+        sets = ", ".join(f"{k} = ?" for k in fields)
+        c.execute(f"UPDATE source SET {sets} WHERE id = ?", (*fields.values(), src["id"]))
+
+
+def _normalize_and_insert(
+    db: Database, conn_rss: RSSConnector, src: dict[str, Any], items: list
+) -> tuple[int, int]:
+    return insert_documents(db, src, [conn_rss.normalize(src, it) for it in items])
+
+
 async def fetch_sources(db: Database, sources: list[dict[str, Any]]) -> dict[str, Any]:
-    """Descarga feeds en paralelo, registra salud e inserta documentos nuevos."""
+    """Descarga feeds en paralelo, registra salud e inserta documentos nuevos.
+
+    Cada fuente está aislada: un fallo (URL inválida, timeout total, BD bloqueada...) se anota en su salud y en
+    stats['errors'] y NUNCA aborta la pasada de las demás. Parseo, normalización e inserción van a un hilo para
+    que el bucle de eventos siga sirviendo la API."""
     conn_rss = RSSConnector()
     sem = asyncio.Semaphore(settings.atlas_ingest_concurrency)
     stats = {
@@ -86,39 +175,41 @@ async def fetch_sources(db: Database, sources: list[dict[str, Any]]) -> dict[str
     }
 
     async def one(src: dict[str, Any], client) -> None:
-        async with sem:
-            res = await conn_rss.fetch(src, client)
-        ts = now_iso()
-        with db.tx() as c:
-            c.execute(
-                "INSERT INTO source_health(source_id, checked_at, ok, items, error, latency_ms) VALUES (?,?,?,?,?,?)",
-                (src["id"], ts, 1 if res.ok else 0, len(res.items), res.error, res.latency_ms),
+        t0 = time.monotonic()
+        try:
+            async with sem:
+                # plazo TOTAL por fuente: el timeout de httpx es por fragmento y un servidor que gotea nunca lo agota
+                async with asyncio.timeout(settings.atlas_source_timeout):
+                    res = await conn_rss.fetch(src, client)
+            ts = now_iso()
+            _record_health(
+                db, src, ts, res.ok, len(res.items), res.error, res.latency_ms, res.etag, res.last_modified
             )
-            fields = {"last_polled_at": ts, "last_error": res.error}
-            if res.ok:
-                fields.update({"last_ok_at": ts, "last_items": len(res.items)})
-                if res.etag:
-                    fields["etag"] = res.etag
-                if res.last_modified:
-                    fields["last_modified"] = res.last_modified
-            sets = ", ".join(f"{k} = ?" for k in fields)
-            c.execute(f"UPDATE source SET {sets} WHERE id = ?", (*fields.values(), src["id"]))
-        if res.not_modified:
-            stats["not_modified"] += 1
-        if not res.ok:
+            if res.not_modified:
+                stats["not_modified"] += 1
+            if not res.ok:
+                stats["failed"] += 1
+                if res.error:
+                    stats["errors"].append(f"{src['slug']}: {res.error[:120]}")
+                return
+            stats["ok"] += 1
+            cap = (
+                MAX_ITEMS_BULLETIN
+                if src.get("type") in ("institution", "statistical_office", "court")
+                else MAX_ITEMS_PER_SOURCE_PER_RUN
+            )
+            new, dup = await asyncio.to_thread(_normalize_and_insert, db, conn_rss, src, res.items[:cap])
+            stats["new_docs"] += new
+            stats["dup_docs"] += dup
+        except Exception as e:  # noqa: BLE001 - una fuente rota no tumba la ingesta
+            err = f"{type(e).__name__}: {e}"[:200]
             stats["failed"] += 1
-            if res.error:
-                stats["errors"].append(f"{src['slug']}: {res.error[:120]}")
-            return
-        stats["ok"] += 1
-        cap = (
-            MAX_ITEMS_BULLETIN
-            if src.get("type") in ("institution", "statistical_office", "court")
-            else MAX_ITEMS_PER_SOURCE_PER_RUN
-        )
-        new, dup = insert_documents(db, src, [conn_rss.normalize(src, it) for it in res.items[:cap]])
-        stats["new_docs"] += new
-        stats["dup_docs"] += dup
+            stats["errors"].append(f"{src['slug']}: {err}"[:120])
+            try:
+                _record_health(db, src, now_iso(), False, 0, err, int((time.monotonic() - t0) * 1000))
+            except Exception as e2:  # noqa: BLE001 - p. ej. BD bloqueada: queda constancia en job_run.stats
+                stats["errors"].append(f"{src['slug']}: salud no registrada: {type(e2).__name__}"[:120])
+                log.warning("source_health %s: %s", src.get("slug"), e2)
 
     async with make_client() as client:
         await asyncio.gather(*(one(s, client) for s in sources))
@@ -126,8 +217,12 @@ async def fetch_sources(db: Database, sources: list[dict[str, Any]]) -> dict[str
 
 
 def insert_documents(db: Database, source: dict[str, Any], docs: list) -> tuple[int, int]:
+    """Inserta documentos nuevos; deduplica por url, canonical_url y (content_hash, fuente). La comprobación va
+    en la MISMA transacción que el INSERT (url es UNIQUE: dos fuentes o dos entradas con la misma URL en vuelo
+    no deben abortar la pasada); con ix_document_canonical cuesta microsegundos."""
     new = dup = 0
     ts = now_iso()
+    fetched = parse_iso(ts)
     with db.tx() as conn:
         for d in docs:
             if d is None:
@@ -140,6 +235,13 @@ def insert_documents(db: Database, source: dict[str, Any], docs: list) -> tuple[
                 dup += 1
                 continue
             doc_id = new_id()
+            published_at = d.published_at or ts
+            meta = dict(d.meta or {})
+            pub = parse_iso(d.published_at) if d.published_at else None
+            if pub and fetched and pub > fetched + PUBLISHED_AT_SKEW:
+                # hora local publicada sin zona y tomada como UTC: quedaría «activo» y en cabeza más de lo debido
+                meta["published_at_reported"] = d.published_at
+                published_at = (fetched + PUBLISHED_AT_SKEW).isoformat()
             conn.execute(
                 """INSERT INTO document(id, source_id, kind, url, canonical_url, title, lede, text, lang, authors, published_at,
                    fetched_at, content_hash, extraction_method, paywalled, meta)
@@ -155,12 +257,12 @@ def insert_documents(db: Database, source: dict[str, Any], docs: list) -> tuple[
                     d.text,
                     d.lang,
                     dumps(d.authors),
-                    d.published_at or ts,
+                    published_at,
                     ts,
                     d.content_hash,
                     d.extraction_method,
                     1 if d.paywalled else 0,
-                    dumps(d.meta),
+                    dumps(meta),
                 ),
             )
             conn.execute(
@@ -192,12 +294,89 @@ def process_new_documents(
             break
     cons = consolidate_events(db)
     total["consolidated"] = cons.get("merged", 0)
+    total["claims_deduplicated"] = 0
     for eid in cons.get("winners", []) or []:
+        total["claims_deduplicated"] += dedup_event_claims(db, eid)
         compute_coverage(db, eid)
         compute_materiality(db, eid)
         deltas_from_event(db, eid)
         evaluate_event(db, eid)
     return total
+
+
+def dedup_event_claims(db: Database, event_id: str) -> int:
+    """Tras fusionar eventos, una misma afirmación (document_id, text_canonical) puede estar repetida en el
+    ganador: consolidate_events solo reasigna `claim.event_id`. Se conserva la más antigua; la evidencia de las
+    demás pasa a ella (salvo la ya presente para ese documento), las repetidas salen del evento con
+    `status='merged'` y todo queda en claim_revision (nunca se borra historia). Devuelve nº de fusionadas."""
+    rows = db.all(
+        "SELECT id, document_id, text_canonical, status FROM claim WHERE event_id = ? ORDER BY created_at ASC, id ASC",
+        (event_id,),
+    )
+    groups: dict[tuple[str, str], list[Any]] = {}
+    for r in rows:
+        groups.setdefault((r["document_id"], r["text_canonical"]), []).append(r)
+    merged = 0
+    ts = now_iso()
+    with db.tx() as conn:
+        for items in groups.values():
+            if len(items) < 2:
+                continue
+            keeper = items[0]
+            for dup in items[1:]:
+                moved = []
+                for ev in conn.execute(
+                    "SELECT id, document_id FROM claim_evidence WHERE claim_id = ?", (dup["id"],)
+                ).fetchall():
+                    present = conn.execute(
+                        "SELECT 1 FROM claim_evidence WHERE claim_id = ? AND document_id = ?",
+                        (keeper["id"], ev["document_id"]),
+                    ).fetchone()
+                    if present:
+                        continue  # la copia idéntica se queda colgando de la afirmación fusionada
+                    conn.execute(
+                        "UPDATE claim_evidence SET claim_id = ? WHERE id = ?", (keeper["id"], ev["id"])
+                    )
+                    moved.append(ev["id"])
+                conn.execute("UPDATE claim SET status = 'merged', event_id = NULL WHERE id = ?", (dup["id"],))
+                conn.execute(
+                    "INSERT INTO claim_revision(id, claim_id, old_status, new_status, reason, evidence_ids, changed_at) VALUES (?,?,?,?,?,?,?)",
+                    (
+                        new_id(),
+                        dup["id"],
+                        dup["status"],
+                        "merged",
+                        f"duplicada de {keeper['id']} (misma afirmación y documento tras fusión de eventos)",
+                        dumps(moved),
+                        ts,
+                    ),
+                )
+                merged += 1
+            ev_rows = [
+                dict(r)
+                for r in conn.execute(
+                    """SELECT ce.stance, ce.quote, d.source_id, s.tier FROM claim_evidence ce
+                       JOIN document d ON d.id = ce.document_id JOIN source s ON s.id = d.source_id
+                       WHERE ce.claim_id = ?""",
+                    (keeper["id"],),
+                ).fetchall()
+            ]
+            new_status = compute_status(ev_rows)
+            if new_status != keeper["status"]:
+                conn.execute("UPDATE claim SET status = ? WHERE id = ?", (new_status, keeper["id"]))
+                conn.execute(
+                    "INSERT INTO claim_revision(id, claim_id, old_status, new_status, reason, evidence_ids, changed_at) VALUES (?,?,?,?,?,?,?)",
+                    (
+                        new_id(),
+                        keeper["id"],
+                        keeper["status"],
+                        new_status,
+                        f"{len(ev_rows)} evidencias tras fusionar afirmaciones duplicadas",
+                        dumps([]),
+                        ts,
+                    ),
+                )
+    return merged
 
 
 def _process_batch(db: Database, max_docs: int, use_llm: bool | None) -> dict[str, Any]:
@@ -333,7 +512,12 @@ def _process_batch(db: Database, max_docs: int, use_llm: bool | None) -> dict[st
         n_titles = 0
         for eid in touched:
             ev = db.one("SELECT n_docs, materiality, title_source FROM event WHERE id = ?", (eid,))
-            if ev and ev["n_docs"] >= 3 and (ev["materiality"] or 0) >= 40 and ev["title_source"] != "llm":
+            if (
+                ev
+                and ev["n_docs"] >= 3
+                and (ev["materiality"] or 0) >= 40
+                and ev["title_source"] not in ("llm", "llm_unverified")
+            ):
                 try:
                     if neutral_title(db, eid, llm):
                         n_titles += 1
@@ -343,22 +527,29 @@ def _process_batch(db: Database, max_docs: int, use_llm: bool | None) -> dict[st
     return stats
 
 
-def recompute_events(db: Database, hours: int = 72) -> dict[str, int]:
+def recompute_events(db: Database, hours: int = 72) -> dict[str, Any]:
     """Consolida duplicados y recalcula cobertura y materialidad de los eventos activos (la novedad decae,
-    las cuotas de producción cambian)."""
-    cons = consolidate_events(db, hours=min(hours, 48))
-    ids = [
-        r["id"]
-        for r in db.all(
-            "SELECT id FROM event WHERE status != 'merged' AND last_update_at >= datetime('now', ?)",
-            (f"-{hours} hours",),
-        )
-    ]
-    shares = baseline_shares(db)
-    for eid in ids:
-        compute_coverage(db, eid, shares)
-        compute_materiality(db, eid)
-    return {"events": len(ids), "consolidated": cons.get("merged", 0)}
+    las cuotas de producción cambian). Comparte cerrojo con la ingesta: consolidar mientras otro ClusterIndex
+    está en memoria dejaría documentos asignados a eventos ya `merged`."""
+    try:
+        with job_lock(db):
+            cons = consolidate_events(db, hours=min(hours, 48))
+            for eid in cons.get("winners", []) or []:
+                dedup_event_claims(db, eid)
+            ids = [
+                r["id"]
+                for r in db.all(
+                    "SELECT id FROM event WHERE status != 'merged' AND last_update_at >= ?",
+                    (since_iso(hours=hours),),
+                )
+            ]
+            shares = baseline_shares(db)
+            for eid in ids:
+                compute_coverage(db, eid, shares)
+                compute_materiality(db, eid)
+            return {"events": len(ids), "consolidated": cons.get("merged", 0)}
+    except JobBusy:
+        return {"events": 0, "consolidated": 0, "started": False, "reason": BUSY_REASON}
 
 
 async def run_ingest(
@@ -367,13 +558,17 @@ async def run_ingest(
     job = _job_start(db, "ingest")
     t0 = time.monotonic()
     try:
-        sources = due_sources(db, force=force, limit=limit_sources)
-        fetch_stats = await fetch_sources(db, sources)
-        # CPU-bound: fuera del bucle de eventos para que la API siga respondiendo durante el procesado
-        proc_stats = await asyncio.to_thread(process_new_documents, db, use_llm=use_llm)
-        stats = {"fetch": fetch_stats, "process": proc_stats, "seconds": round(time.monotonic() - t0, 1)}
-        _job_end(db, job, True, stats)
-        return stats
+        with job_lock(db):
+            sources = due_sources(db, force=force, limit=limit_sources)
+            fetch_stats = await fetch_sources(db, sources)
+            # CPU-bound: fuera del bucle de eventos para que la API siga respondiendo durante el procesado
+            proc_stats = await asyncio.to_thread(process_new_documents, db, use_llm=use_llm)
+            stats = {"fetch": fetch_stats, "process": proc_stats, "seconds": round(time.monotonic() - t0, 1)}
+            _job_end(db, job, True, stats)
+            return stats
+    except JobBusy:
+        _job_end(db, job, False, {"skipped": True}, BUSY_REASON)
+        return {"started": False, "reason": BUSY_REASON}
     except Exception as e:  # noqa: BLE001
         _job_end(db, job, False, {"seconds": round(time.monotonic() - t0, 1)}, f"{type(e).__name__}: {e}")
         raise
@@ -392,6 +587,76 @@ async def run_markets(db: Database) -> dict[str, Any]:
     except Exception as e:  # noqa: BLE001
         _job_end(db, job, False, {}, f"{type(e).__name__}: {e}")
         raise
+
+
+def _merge_document_into(db: Database, dup_id: str, keep_id: str) -> None:
+    """Fusiona el documento `dup_id` en `keep_id` (misma URL absoluta): mueve entidades, pertenencia a evento,
+    afirmaciones, evidencias, lecturas y deltas; solo entonces se elimina la fila duplicada."""
+    with db.tx() as conn:
+        dup = conn.execute("SELECT event_id FROM document WHERE id = ?", (dup_id,)).fetchone()
+        keep = conn.execute("SELECT event_id FROM document WHERE id = ?", (keep_id,)).fetchone()
+        conn.execute(
+            "INSERT OR IGNORE INTO document_entity(document_id, entity_id, salience) SELECT ?, entity_id, salience FROM document_entity WHERE document_id = ?",
+            (keep_id, dup_id),
+        )
+        conn.execute("DELETE FROM document_entity WHERE document_id = ?", (dup_id,))
+        conn.execute(
+            "INSERT OR IGNORE INTO event_document(event_id, document_id, similarity) SELECT event_id, ?, similarity FROM event_document WHERE document_id = ?",
+            (keep_id, dup_id),
+        )
+        conn.execute("DELETE FROM event_document WHERE document_id = ?", (dup_id,))
+        for table, col in (
+            ("claim", "document_id"),
+            ("claim_evidence", "document_id"),
+            ("reading_log", "document_id"),
+            ("state_delta", "source_doc_id"),
+            ("state_observation", "source_doc_id"),
+        ):
+            conn.execute(f"UPDATE {table} SET {col} = ? WHERE {col} = ?", (keep_id, dup_id))
+        conn.execute("UPDATE event SET lead_document_id = ? WHERE lead_document_id = ?", (keep_id, dup_id))
+        if keep and dup and keep["event_id"] is None and dup["event_id"]:
+            conn.execute("UPDATE document SET event_id = ? WHERE id = ?", (dup["event_id"], keep_id))
+        conn.execute("DELETE FROM document_fts WHERE doc_id = ?", (dup_id,))
+        conn.execute("DELETE FROM document WHERE id = ?", (dup_id,))
+        for ev in {dup["event_id"] if dup else None, keep["event_id"] if keep else None} - {None}:
+            conn.execute(
+                "UPDATE event SET n_docs = (SELECT COUNT(*) FROM document WHERE event_id = ?) WHERE id = ?",
+                (ev, ev),
+            )
+    for ev in {dup["event_id"] if dup else None, keep["event_id"] if keep else None} - {None}:
+        dedup_event_claims(db, ev)
+
+
+def repair_relative_urls(db: Database, apply: bool = False) -> dict[str, Any]:
+    """Reparación única de documentos guardados con enlace relativo ('/article/x', 'www.bea.gov/...') antes de
+    que el conector resolviera los enlaces: se resuelven contra el feed guardado en meta.feed (o el dominio de
+    la fuente). Si la URL absoluta ya existe (reingesta posterior), el duplicado se fusiona con
+    `_merge_document_into`, nunca con un DELETE ciego. Con apply=False solo cuenta."""
+    rows = db.all(
+        """SELECT d.id, d.url, d.meta, s.domain FROM document d JOIN source s ON s.id = d.source_id
+           WHERE d.url NOT LIKE 'http://%' AND d.url NOT LIKE 'https://%'"""
+    )
+    out = {"candidates": len(rows), "fixed": 0, "merged": 0, "unresolved": 0, "applied": apply}
+    for r in rows:
+        feed = (loads(r["meta"], {}) or {}).get("feed") or (f"https://{r['domain']}/" if r["domain"] else "")
+        new_url = resolve_link(r["url"], feed, r["domain"]) if feed else None
+        if not new_url:
+            out["unresolved"] += 1
+            continue
+        other = db.one("SELECT id FROM document WHERE url = ? AND id != ?", (new_url, r["id"]))
+        if other:
+            out["merged"] += 1
+            if apply:
+                _merge_document_into(db, r["id"], other["id"])
+            continue
+        out["fixed"] += 1
+        if apply:
+            with db.tx() as conn:
+                conn.execute(
+                    "UPDATE document SET url = ?, canonical_url = ? WHERE id = ?",
+                    (new_url, canonicalize_url(new_url), r["id"]),
+                )
+    return out
 
 
 def event_summary_row(db: Database, row) -> dict[str, Any]:

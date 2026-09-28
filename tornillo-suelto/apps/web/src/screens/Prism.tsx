@@ -155,7 +155,7 @@ export default function Prism() {
                 <i style={{ outline: '2px solid var(--c-warn)', outlineOffset: -2 }} /> ∅ silencio (S &gt; 2, E ≥ 5)
               </span>
               <span>
-                <i style={{ outline: '2px dashed var(--c-black)', outlineOffset: -2 }} /> sobrecobertura
+                <i style={{ outline: '2px dashed var(--c-ink)', outlineOffset: -2 }} /> sobrecobertura
               </span>
             </div>
           </section>
@@ -304,7 +304,7 @@ export default function Prism() {
               ))}
               {data.frames.length === 0 && (
                 <p className="muted small" style={{ marginTop: 12 }}>
-                  Marcos (familias de encuadre): requieren el clasificador con modelo; sin clave no se generan.
+                  Marcos (familias de encuadre): pendiente de implementar; el clasificador aún no está cableado en el pipeline (con o sin clave).
                 </p>
               )}
             </section>

@@ -22,6 +22,7 @@ mercados se cargan con «Actualizar mercados» (`POST /api/machine/markets`).
 npm run build      # tsc -b + vite build → dist/
 npm run preview    # sirve dist/ con el mismo proxy de /api
 npm run lint       # oxlint
+npm test           # vitest (jsdom): pruebas unitarias de src/**/*.test.ts
 ```
 
 El backend sirve `apps/web/dist` como SPA (rutas de historial con fallback a `index.html`, `/assets` y `/fonts`).
@@ -41,13 +42,16 @@ src/
   api/
     types.ts             tipos derivados de las respuestas reales de la API
     client.ts            cliente fetch tipado (todas las rutas /api) y ApiError (409 = agentes sin clave)
-    sse.ts               streaming de agentes: EventSource (GET) y fetch con lector de stream (POST socratic)
+    sse.ts               streaming de agentes: fetch con lector de stream para GET y POST (el cuerpo del 409/429
+                         llega como evento `error`; sin EventSource no hay reconexión automática ni doble ejecución)
   state/store.tsx        contexto global: ajustes (GET/PUT /api/settings), modo, tema, densidad, selección,
                          panel contextual, estado de agentes, avisos; navegación por modo (MODE_NAV)
   lib/
     labels.ts            etiquetas en español de dominios, ecosistemas, bloques, niveles, estados, procedencia
     format.ts            fechas y cifras (es-ES), escala secuencial amarillo → negro (seqColor)
-    hooks.ts             useAsync, useDietLog (POST /api/diet/log open/read), useInterval, useSize…
+    hooks.ts             useAsync, useDietLog (POST /api/diet/log: open al abrir, read al ocultar/cerrar/desmontar),
+                         useInterval, useSize…
+    diet.ts              sesión de lectura de la DIETA (visibilitychange/pagehide, sendBeacon); con prueba unitaria
     keyboard.ts          atajos globales estilo gmail (g r, g e, j/k, o, n, f, ?, 1/2/3, ⌘K, [)
   components/
     ui/                  Card, Chip, StatusIcon, Level, ProvenanceChip, MaterialityBar + Breakdown (ⓘ),

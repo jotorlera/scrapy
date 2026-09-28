@@ -1,0 +1,59 @@
+# ATLAS — Perfil del usuario (PLANTILLA versionada, sin datos reales)
+# Copia este archivo a config/perfil.yaml (que está en .gitignore) y rellénalo:
+#     cp config/perfil.example.yaml config/perfil.yaml && .venv/bin/atlas seed
+# El perfil se carga en la DB local y nunca se envía completo a un LLM (CLAUDE.md, regla 5):
+# study_context() solo comparte «estudios»; los negocios solo salen cuando hay exposure_alert.
+
+usuario:
+  nombre: "Nombre Apellidos"
+  firma_trabajos: "Nombre Apellidos"     # firma que usa la exportación Markdown del TALLER
+  idiomas: [es, en]
+  zona_horaria: "Europe/Madrid"          # el Brief usa esta zona
+  hora_brief: "07:00"
+  email_brief: null                      # opcional
+
+estudios:
+  grado: "Grado que cursas"
+  universidad: "Universidad"
+  asignaturas_en_curso:
+    - nombre: "Asignatura 1"
+      bibliografia:
+        - "Autor — Obra"
+    - nombre: "Asignatura 2"
+      bibliografia:
+        - "Autor — Obra"
+  intereses_teoricos_semilla:
+    - "Tema de interés 1"
+    - "Tema de interés 2"
+  conceptos_a_etiquetar:   # el sistema etiqueta eventos con estos conceptos (ampliable)
+    filosofia: [libertad negativa, libertad positiva, contrato social, justicia distributiva, legitimidad, soberanía]
+    ciencia_politica: [separación de poderes, populismo, polarización, sistema de partidos, federalismo, estado de derecho]
+    economia: [externalidades, incentivos, curva de Phillips, dominancia fiscal, ventaja comparativa, riesgo moral]
+    rrii: [dilema de seguridad, equilibrio de poder, disuasión, interdependencia compleja, poder blando, hegemonía]
+
+investigacion:
+  areas: [área de investigación 1, área de investigación 2]
+  nicho_estrategico: "Descripción breve del cruce temático que quieres vigilar"
+  vigilar_huecos_de_investigacion: true
+
+negocios:   # base para MANDO (exposición por canal, radar regulatorio). Uno por empresa o proyecto.
+  - nombre: "Empresa ejemplo 1"
+    sectores: [sector]
+    jurisdicciones: [ES, EU]              # códigos ISO-2 (EU para normativa comunitaria)
+    regulacion_relevante: [norma o ámbito regulatorio]
+    palabras_clave: []                    # términos que deben disparar el radar regulatorio
+  - nombre: "Proyecto ejemplo 2"
+    sectores: [sector]
+    jurisdicciones: []
+    regulacion_relevante: []
+    palabras_clave: []
+
+negocios_contexto:
+  divisas_relevantes: [EUR, USD]
+  colaboraciones: []
+
+preferencias_atlas:
+  paises_nivel_A_extra: []               # además de los de config/paises.yaml
+  tope_coste_diario_usd: 10
+  modo_inicio: ANALISTA
+  tema: claro

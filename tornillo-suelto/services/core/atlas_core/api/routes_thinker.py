@@ -10,13 +10,22 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
-from ..db import dumps, loads, new_id, now_iso
+from ..db import Database, dumps, loads, new_id, now_iso
 from ..engines import forecast as fmath
 from ..engines.archive import analogs, compare_cases
 from ..seed_data import GENEALOGY_LIBERTY
-from .deps import db, event_out
+from ..util import parse_iso
+from .deps import TopNQ, db, event_out
 
 router = APIRouter()
+
+
+def _require_row(d: Database, table: str, row_id: str, what: str) -> None:
+    """Sin claves ajenas en el esquema (salvo document.source_id), cada escritura comprueba que el padre exista:
+    si no, la UI vería «Guardado» sobre nada o quedarían filas huérfanas."""
+    if not d.one(f"SELECT 1 FROM {table} WHERE id = ?", (row_id,)):
+        raise HTTPException(404, f"{what} no encontrado")
+
 
 # ───────────── ÁGORA ─────────────
 
@@ -123,6 +132,7 @@ def add_node(map_id: str, body: NodeIn) -> dict[str, Any]:
     if body.kind not in ("thesis", "premise", "objection", "reply", "evidence", "author", "work"):
         raise HTTPException(400, "kind inválido")
     d = db()
+    _require_row(d, "argument_map", map_id, "mapa")
     nid = new_id()
     with d.tx() as conn:
         conn.execute(
@@ -143,6 +153,7 @@ class NodeUpdate(BaseModel):
 @router.put("/agora/nodes/{node_id}")
 def update_node(node_id: str, body: NodeUpdate) -> dict[str, Any]:
     d = db()
+    _require_row(d, "argument_node", node_id, "nodo")  # con fields vacío no hay UPDATE: comprobar con SELECT
     fields = {k: v for k, v in body.model_dump().items() if v is not None}
     if fields:
         d.update("argument_node", node_id, fields)
@@ -169,6 +180,14 @@ def add_edge(map_id: str, body: EdgeIn) -> dict[str, Any]:
     if body.rel not in ("supports", "attacks", "replies", "instantiates"):
         raise HTTPException(400, "rel inválida")
     d = db()
+    _require_row(d, "argument_map", map_id, "mapa")
+    n_ends = d.scalar(
+        "SELECT COUNT(*) FROM argument_node WHERE map_id = ? AND id IN (?, ?)",
+        (map_id, body.src, body.dst),
+        0,
+    )
+    if n_ends != 2 or body.src == body.dst:
+        raise HTTPException(400, "src y dst deben ser dos nodos distintos de este mapa")
     eid = new_id()
     with d.tx() as conn:
         conn.execute(
@@ -218,7 +237,7 @@ def cases(q: str | None = None, category: str | None = None) -> dict[str, Any]:
 
 @router.get("/archive/analogs")
 def archive_analogs(
-    q: str | None = None, event_id: str | None = None, category: str | None = None, n: int = 4
+    q: str | None = None, event_id: str | None = None, category: str | None = None, n: TopNQ = 4
 ) -> dict[str, Any]:
     d = db()
     text = q or ""
@@ -294,9 +313,21 @@ class QuestionIn(BaseModel):
     base_rate_note: str | None = None
 
 
+def _made_before_close(made_at: str | None, close_at: str | None) -> bool:
+    """Un pronóstico posterior al cierre (cuando el resultado puede conocerse) no puntúa. Se compara en Python:
+    el backend guarda '+00:00' y el frontend envía '.000Z', así que la comparación de cadenas en SQL no vale."""
+    made, close = parse_iso(made_at), parse_iso(close_at)
+    return made is None or close is None or made <= close
+
+
 @router.post("/forecasts")
 def create_question(body: QuestionIn) -> dict[str, Any]:
     issues = fmath.question_quality_issues(body.title, body.resolution_criteria, body.base_rate)
+    close = parse_iso(body.close_at)
+    if close is None:
+        issues.append("La fecha de cierre debe ser una fecha ISO 8601.")
+    elif close <= datetime.now(UTC):
+        issues.append("La fecha de cierre debe ser futura.")
     if issues:
         raise HTTPException(422, {"issues": issues})
     d = db()
@@ -343,16 +374,18 @@ def create_question(body: QuestionIn) -> dict[str, Any]:
 def calibration(forecaster: str = "user") -> dict[str, Any]:
     d = db()
     rows = d.all(
-        """SELECT f.probability, q.outcome FROM forecast f JOIN forecast_question q ON q.id = f.question_id
-           WHERE q.status = 'resolved' AND f.forecaster = ? AND f.id IN (SELECT id FROM forecast f2 WHERE f2.question_id = f.question_id AND f2.forecaster = f.forecaster ORDER BY made_at DESC LIMIT 1)""",
+        """SELECT f.question_id, f.probability, f.made_at, q.close_at, q.outcome
+           FROM forecast f JOIN forecast_question q ON q.id = f.question_id
+           WHERE q.status = 'resolved' AND f.forecaster = ? ORDER BY f.made_at""",
         (forecaster,),
     )
-    pairs = []
+    # último pronóstico por pregunta hecho antes del cierre (mismo criterio que resolve_question)
+    last: dict[str, tuple[float, int]] = {}
     for r in rows:
         o = loads(r["outcome"], {}) or {}
-        if "value" in o:
-            pairs.append((float(r["probability"]), int(o["value"])))
-    cal = fmath.calibration(pairs)
+        if "value" in o and _made_before_close(r["made_at"], r["close_at"]):
+            last[r["question_id"]] = (float(r["probability"]), int(o["value"]))
+    cal = fmath.calibration(list(last.values()))
     forecasters = [
         r["forecaster"] for r in d.all("SELECT DISTINCT forecaster FROM forecast_score ORDER BY forecaster")
     ]
@@ -362,12 +395,27 @@ def calibration(forecaster: str = "user") -> dict[str, Any]:
             "SELECT forecaster, COUNT(*) n, AVG(brier) brier, AVG(log_score) log_score FROM forecast_score GROUP BY forecaster ORDER BY brier"
         )
     ]
-    base = next((s for s in summary if s["forecaster"] == "base_rate"), None)
+    # BSS emparejado: solo sobre las preguntas en que participan los dos, nunca medias sobre conjuntos distintos.
+    market_refs = [f for f in forecasters if f.startswith("market:")]
     for s in summary:
-        s["bss_vs_base_rate"] = (
-            fmath.brier_skill_score(s["brier"], base["brier"]) if base and base["brier"] else None
-        )
+        base = _paired_bss(d, s["forecaster"], "base_rate")
+        s["bss_vs_base_rate"] = base["bss"]
+        s["n_paired_base_rate"] = base["n_paired"]
+        s["bss_vs_market"] = {ref: _paired_bss(d, s["forecaster"], ref) for ref in market_refs}
     return {"forecaster": forecaster, "calibration": cal, "forecasters": forecasters, "summary": summary}
+
+
+def _paired_bss(d: Database, forecaster: str, ref: str) -> dict[str, Any]:
+    """BSS = 1 − Brier(forecaster)/Brier(ref) sobre las mismas preguntas. Una consulta por referencia: así una
+    pregunta con varios market:venue no duplica filas."""
+    r = d.one(
+        "SELECT COUNT(*) n, AVG(a.brier) b_model, AVG(b.brier) b_ref FROM forecast_score a "
+        "JOIN forecast_score b ON b.question_id = a.question_id AND b.forecaster = ? WHERE a.forecaster = ?",
+        (ref, forecaster),
+    )
+    n = (r["n"] if r else 0) or 0
+    bss = fmath.brier_skill_score(r["b_model"], r["b_ref"]) if n and r["b_ref"] else None
+    return {"n_paired": n, "bss": None if bss is None else round(bss, 4)}
 
 
 @router.get("/forecasts/{qid}")
@@ -392,11 +440,14 @@ class ForecastIn(BaseModel):
 @router.post("/forecasts/{qid}/forecast")
 def add_forecast(qid: str, body: ForecastIn) -> dict[str, Any]:
     d = db()
-    q = d.one("SELECT status FROM forecast_question WHERE id = ?", (qid,))
+    q = d.one("SELECT status, close_at FROM forecast_question WHERE id = ?", (qid,))
     if not q:
         raise HTTPException(404, "pregunta no encontrada")
     if q["status"] != "open":
         raise HTTPException(400, "la pregunta no está abierta")
+    close = parse_iso(q["close_at"])
+    if close is not None and close <= datetime.now(UTC):
+        raise HTTPException(400, f"la pregunta cerró el {q['close_at']}: ya no admite pronósticos")
     if body.forecaster not in ("user",):
         raise HTTPException(400, "desde la UI solo se registran pronósticos del usuario")
     with d.tx() as conn:
@@ -420,31 +471,45 @@ class ResolveIn(BaseModel):
 @router.post("/forecasts/{qid}/resolve")
 def resolve_question(qid: str, body: ResolveIn) -> dict[str, Any]:
     d = db()
-    q = d.one("SELECT * FROM forecast_question WHERE id = ?", (qid,))
+    q = d.one("SELECT close_at FROM forecast_question WHERE id = ?", (qid,))
     if not q:
         raise HTTPException(404, "pregunta no encontrada")
-    scores = {}
+    scores: dict[str, Any] = {}
+    ignored: list[dict[str, Any]] = []
     with d.tx() as conn:
-        conn.execute(
-            "UPDATE forecast_question SET status = 'resolved', resolved_at = ?, outcome = ? WHERE id = ?",
+        # Guarda atómica: solo se resuelve una vez (SQLite serializa escritores; un SELECT previo no cierra la
+        # carrera). Una resolución nunca sobrescribe otra: «los cambios de estado se registran».
+        cur = conn.execute(
+            "UPDATE forecast_question SET status = 'resolved', resolved_at = ?, outcome = ? "
+            "WHERE id = ? AND status = 'open'",
             (now_iso(), dumps({"value": body.outcome, "note": body.note}), qid),
         )
-        # último pronóstico de cada pronosticador antes del cierre
+        if cur.rowcount == 0:
+            raise HTTPException(409, "la pregunta ya está resuelta")
+        # último pronóstico de cada pronosticador hecho antes del cierre; los posteriores (agentes, mercados
+        # enlazados tarde) se descartan y se devuelven para que quede visible
         rows = conn.execute(
-            "SELECT forecaster, probability FROM forecast WHERE question_id = ? ORDER BY made_at", (qid,)
+            "SELECT forecaster, probability, made_at FROM forecast WHERE question_id = ? ORDER BY made_at",
+            (qid,),
         ).fetchall()
         last: dict[str, float] = {}
         for r in rows:
-            last[r["forecaster"]] = r["probability"]
+            if _made_before_close(r["made_at"], q["close_at"]):
+                last[r["forecaster"]] = r["probability"]
+            else:
+                ignored.append(
+                    {"forecaster": r["forecaster"], "p": r["probability"], "made_at": r["made_at"]}
+                )
         for f, p in last.items():
             b = fmath.brier(p, body.outcome)
             ls = fmath.log_score(p, body.outcome)
+            # INSERT plano: este endpoint es el único escritor y la PK (question_id, forecaster) es el invariante
             conn.execute(
-                "INSERT OR REPLACE INTO forecast_score(question_id, forecaster, brier, log_score) VALUES (?,?,?,?)",
+                "INSERT INTO forecast_score(question_id, forecaster, brier, log_score) VALUES (?,?,?,?)",
                 (qid, f, round(b, 4), round(ls, 4)),
             )
             scores[f] = {"brier": round(b, 4), "log_score": round(ls, 4), "p": p}
-    return {"ok": True, "scores": scores}
+    return {"ok": True, "scores": scores, "ignored_after_close": ignored}
 
 
 class LinkMarketIn(BaseModel):
@@ -454,6 +519,7 @@ class LinkMarketIn(BaseModel):
 @router.post("/forecasts/{qid}/link_market")
 def link_market(qid: str, body: LinkMarketIn) -> dict[str, Any]:
     d = db()
+    _require_row(d, "forecast_question", qid, "pregunta")
     m = d.one("SELECT * FROM prediction_market WHERE id = ?", (body.market_id,))
     if not m:
         raise HTTPException(404, "mercado no encontrado")
@@ -546,6 +612,7 @@ def get_note(note_id: str) -> dict[str, Any]:
 @router.put("/notes/{note_id}")
 def update_note(note_id: str, body: NoteIn) -> dict[str, Any]:
     d = db()
+    _require_row(d, "note", note_id, "nota")
     links = sorted(set(_LINK_RE.findall(body.body_text)))
     d.update(
         "note",

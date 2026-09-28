@@ -222,7 +222,7 @@
   top: 8px;
   width: 8px;
   height: 8px;
-  background: var(--c-black);
+  background: var(--c-ink);
 }
 .timeline li.revision::before {
   background: var(--c-accent);
@@ -273,7 +273,7 @@
   color: var(--c-warn);
 }
 .prism-matrix td .cell.over {
-  outline: 2px dashed var(--c-black);
+  outline: 2px dashed var(--c-ink);
   outline-offset: -2px;
 }
 .prism-legend {
@@ -317,7 +317,7 @@
 }
 .diff .dhead {
   padding: 6px 10px;
-  border-bottom: 1px solid var(--c-black);
+  border-bottom: 1px solid var(--c-ink);
   background: var(--c-surface);
   position: sticky;
   top: 0;
@@ -363,14 +363,14 @@
 }
 .graph-svg .node rect {
   fill: var(--c-surface);
-  stroke: var(--c-black);
+  stroke: var(--c-ink);
 }
 .graph-svg .node text {
   font-size: 11px;
   fill: var(--c-text);
 }
 .graph-svg .edge {
-  stroke: var(--c-black);
+  stroke: var(--c-ink);
   fill: none;
 }
 .graph-svg .edge.neg {
@@ -400,7 +400,7 @@
   background: var(--c-accent);
 }
 .pbars .bar.system > i {
-  background: var(--c-black);
+  background: var(--c-ink);
 }
 .pbars .bar.market > i {
   background: var(--c-link);
@@ -484,7 +484,7 @@
   margin-bottom: 2px;
 }
 .brief-close {
-  border: 1px solid var(--c-black);
+  border: 1px solid var(--c-ink);
   border-left: 6px solid var(--c-accent);
   padding: var(--sp-3);
   margin-top: var(--sp-4);
@@ -508,7 +508,7 @@
   min-height: 480px;
 }
 .map-canvas {
-  border: 1px solid var(--c-black);
+  border: 1px solid var(--c-ink);
   background: var(--c-bg);
   overflow: hidden;
   position: relative;
@@ -527,7 +527,7 @@
 }
 .arg-node .shape {
   fill: var(--c-bg);
-  stroke: var(--c-black);
+  stroke: var(--c-ink);
   stroke-width: 1.2;
 }
 .arg-node.selected .shape {
@@ -564,7 +564,7 @@
 }
 .arg-edge {
   fill: none;
-  stroke: var(--c-black);
+  stroke: var(--c-ink);
   stroke-width: 1.4;
 }
 .arg-edge.attacks {
@@ -601,7 +601,7 @@
 }
 .genealogy .gnode rect {
   fill: var(--c-bg);
-  stroke: var(--c-black);
+  stroke: var(--c-ink);
 }
 .genealogy .gnode text {
   font-size: 11px;
@@ -639,7 +639,7 @@
   border: 1px solid var(--c-line);
 }
 .chat .msg.user {
-  border-left: 4px solid var(--c-black);
+  border-left: 4px solid var(--c-ink);
   background: var(--c-surface);
   margin-left: 15%;
 }
@@ -703,7 +703,7 @@
 }
 .review-card {
   max-width: 560px;
-  border: 1px solid var(--c-black);
+  border: 1px solid var(--c-ink);
   border-top: 4px solid var(--c-accent);
   padding: var(--sp-4);
   font-size: var(--fs-read);

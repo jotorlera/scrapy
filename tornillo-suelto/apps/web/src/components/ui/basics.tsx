@@ -155,7 +155,7 @@ export function Sparkline({ values, width = 64, height = 18, stroke = 'currentCo
     <svg className="spark" width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
       {baseline && <line x1={0} x2={width} y1={first} y2={first} stroke="var(--c-line)" strokeWidth={1} />}
       <polyline points={pts.join(' ')} fill="none" stroke={stroke} strokeWidth={1.2} />
-      <circle cx={pts[pts.length - 1].split(',')[0]} cy={pts[pts.length - 1].split(',')[1]} r={1.6} fill="var(--c-accent)" stroke="var(--c-black)" strokeWidth={0.6} />
+      <circle cx={pts[pts.length - 1].split(',')[0]} cy={pts[pts.length - 1].split(',')[1]} r={1.6} fill="var(--c-accent)" stroke="var(--c-ink)" strokeWidth={0.6} />
     </svg>
   )
 }

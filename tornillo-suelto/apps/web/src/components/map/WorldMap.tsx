@@ -42,6 +42,8 @@ export function WorldMap({ events, countries = [], onEvent, highlightIso2, minHe
   const [wrapRef, size] = useSize<HTMLDivElement>()
   const [features, setFeatures] = useState<CountryFeature[]>([])
   const [tip, setTip] = useState<{ x: number; y: number; title: string; sub: string } | null>(null)
+  /* País con foco de teclado: su anillo se pinta aparte, encima de todos los países. */
+  const [focusFeature, setFocusFeature] = useState<CountryFeature | null>(null)
   const nav = useNavigate()
   const svgRef = useRef<SVGSVGElement>(null)
 
@@ -71,6 +73,7 @@ export function WorldMap({ events, countries = [], onEvent, highlightIso2, minHe
   }, [features, countries])
 
   const countryPaths = useMemo(() => features.map((f) => ({ f, d: path(f as unknown as GeoPermissibleObjects) ?? '' })), [features, path])
+  const focusD = focusFeature ? path(focusFeature as unknown as GeoPermissibleObjects) : null
   const graticule = useMemo(() => path(geoGraticule10()) ?? '', [path])
   const sphere = useMemo(() => path({ type: 'Sphere' } as GeoPermissibleObjects) ?? '', [path])
 
@@ -131,12 +134,26 @@ export function WorldMap({ events, countries = [], onEvent, highlightIso2, minHe
                 aria-label={iso ? `Ficha de ${c!.name}` : undefined}
                 onClick={iso ? () => nav(`/paises/${iso}`) : undefined}
                 onKeyDown={iso ? (e) => e.key === 'Enter' && nav(`/paises/${iso}`) : undefined}
+                onFocus={
+                  iso
+                    ? (e) => {
+                        if (e.currentTarget.matches(':focus-visible')) setFocusFeature(f)
+                      }
+                    : undefined
+                }
+                onBlur={iso ? () => setFocusFeature(null) : undefined}
                 onMouseMove={(e) => showTip(e, c?.name ?? f.properties.name ?? '—', iso ? `${iso} · nivel ${c!.level} · ${c!.events_7d} eventos 7 d` : 'sin ficha en el gazetteer')}
                 onMouseLeave={() => setTip(null)}
               />
             )
           })}
         </g>
+        {focusD && (
+          <g className="country-focus" aria-hidden="true">
+            <path d={focusD} className="ring outer" />
+            <path d={focusD} className="ring inner" />
+          </g>
+        )}
         <g className="events">
           {points.map(({ e, x, y, r, fresh }) => (
             <g key={e.id} transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`}>

@@ -3,7 +3,10 @@ variables de estado, casos históricos, mapa argumental de la RBU. Idempotente."
 
 from __future__ import annotations
 
+import logging
 from typing import Any
+
+import httpx
 
 from .config_loader import feeds_catalog, profile_config, sources_seed
 from .db import Database, dumps, new_id, now_iso
@@ -12,8 +15,28 @@ from .engines.state import seed_state_variables
 from .gazetteer import _INSTITUTIONS, countries
 from .seed_data import HISTORICAL_CASES, RBU_MAP, SEED_NOTE
 
+log = logging.getLogger("atlas.seed")
+
 POLL_BY_TIER = {1: 20, 2: 20, 3: 45, 4: 90}
 PRIMARY_TYPES = ("institution", "central_bank", "court", "statistical_office", "intl_org")
+
+
+def valid_feed_urls(slug: str, urls: list[str]) -> list[str]:
+    """Defensa en origen: los feeds vienen de YAML editado a mano y del autodescubrimiento; una URL malformada
+    ('https://[::1/rss') lanza httpx.InvalidURL en cada pasada. Se descartan con aviso antes de llegar a
+    `source.feeds`."""
+    out: list[str] = []
+    for u in urls:
+        u = (u or "").strip()
+        try:
+            ok = u.startswith(("http://", "https://")) and bool(httpx.URL(u).host)
+        except httpx.InvalidURL:
+            ok = False
+        if ok:
+            out.append(u)
+        else:
+            log.warning("feed inválido descartado (%s): %r", slug, u)
+    return out
 
 
 def _label(s: dict) -> str | None:
@@ -33,7 +56,7 @@ def seed_sources(db: Database) -> dict[str, int]:
         for s in seeds:
             slug = s["slug"]
             row = conn.execute("SELECT id, feeds FROM source WHERE slug = ?", (slug,)).fetchone()
-            feed_list = feeds.get(slug, [])
+            feed_list = valid_feed_urls(slug, feeds.get(slug, []))
             if row is None:
                 conn.execute(
                     """INSERT INTO source(id, slug, name, domain, type, tier, country, languages, region_bloc, state_relation,

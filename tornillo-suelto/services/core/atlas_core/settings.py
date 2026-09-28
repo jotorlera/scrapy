@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     atlas_scheduler: int = 1
     atlas_ingest_concurrency: int = 12
     atlas_timezone: str = "Europe/Monaco"
+    # tope del cuerpo de un feed (bytes, ya descomprimido) y plazo total por fuente (segundos)
+    atlas_max_feed_bytes: int = 5_000_000
+    atlas_source_timeout: float = 60.0
 
     @property
     def db_path(self) -> Path:

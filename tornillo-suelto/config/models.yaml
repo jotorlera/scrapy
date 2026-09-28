@@ -18,6 +18,8 @@ tiers:
     max_tokens: 8192
 prompt_caching: true
 max_retries_on_schema_error: 1
+# Salida cortada (stop_reason=max_tokens): un reintento con el doble de max_tokens, sin pasar de este tope.
+max_tokens_retry_cap: 16000
 # USD por millón de tokens (entrada, salida, lectura de caché, escritura de caché)
 pricing_usd_per_mtok:
   claude-haiku-4-5:  {input: 1.00, output: 5.00, cache_read: 0.10, cache_write: 1.25}

@@ -7,14 +7,16 @@ contenido si el medio lo incluye), sin saltarse muros de pago. El texto completo
 
 from __future__ import annotations
 
+import asyncio
 import re
 import time
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 import feedparser
 import httpx
 
+from ..settings import settings
 from ..util import canonicalize_url, clean_html, content_hash, to_iso, truncate
 from .base import DocumentIn, FetchResult, RawItem
 
@@ -86,12 +88,69 @@ def _lang_code(value: str | None) -> str | None:
     return code if 2 <= len(code) <= 3 and code.isalpha() else None
 
 
-def parse_feed(content: bytes | str) -> feedparser.FeedParserDict:
+def parse_feed(content: bytes | str, base_url: str | None = None) -> feedparser.FeedParserDict:
+    """Parsea el feed. Con `base_url` feedparser resuelve él mismo los enlaces relativos; `fetch()` no lo usa
+    porque feedparser convertiría un host sin esquema ('www.bea.gov/x') en '<feed>/www.bea.gov/x': los enlaces
+    se resuelven con `resolve_link`, que conoce el dominio de la fuente."""
+    if base_url:
+        return feedparser.parse(content, response_headers={"content-location": base_url})
     return feedparser.parse(content)
 
 
 def is_valid_feed(parsed: feedparser.FeedParserDict) -> bool:
     return bool(getattr(parsed, "entries", None)) and len(parsed.entries) > 0
+
+
+def resolve_link(link: str | None, base_url: str, source_domain: str | None = None) -> str | None:
+    """Enlace absoluto http(s) de una entrada o None.
+
+    '/article/x' y 'rel/news.html' se resuelven contra la URL del feed; 'www.bea.gov/news/x' (host sin esquema)
+    solo se acepta si ese host es el del feed o el dominio de la fuente (no una heurística genérica de
+    "parece un host", que convertiría 'news.html' en 'https://news.html').
+    """
+    link = (link or "").strip()
+    if not link:
+        return None
+    parts = urlsplit(link)
+    if not parts.scheme and not link.startswith("/"):
+        host = link.split("/", 1)[0].split("?", 1)[0].split("#", 1)[0].lower()
+        feed_host = (urlsplit(base_url).hostname or "").lower()
+        dom = (source_domain or "").lower().removeprefix("www.")
+        own_host = bool(host) and (
+            host == feed_host or (bool(dom) and (host == dom or host.endswith("." + dom)))
+        )
+        if own_host:
+            link = "https://" + link
+    link = urljoin(base_url, link)
+    p = urlsplit(link)
+    return link if p.scheme in ("http", "https") and p.netloc else None
+
+
+class FeedTooLarge(Exception):
+    """El cuerpo del feed supera `settings.atlas_max_feed_bytes` (por Content-Length o durante la descarga)."""
+
+
+async def get_bounded(
+    client: httpx.AsyncClient, url: str, headers: dict[str, str] | None = None, max_bytes: int | None = None
+) -> tuple[httpx.Response, bytes]:
+    """GET en streaming con tope de tamaño: rechaza por Content-Length y aborta en cuanto el cuerpo
+    (ya descomprimido: httpx descodifica Content-Encoding) supera `max_bytes`. Devuelve (respuesta, cuerpo);
+    para 304 y errores HTTP el cuerpo no se lee."""
+    limit = max_bytes or settings.atlas_max_feed_bytes
+    chunks: list[bytes] = []
+    async with client.stream("GET", url, headers=headers or {}) as r:
+        length = r.headers.get("content-length", "")
+        if length.isdigit() and int(length) > limit:
+            raise FeedTooLarge(f"Content-Length {int(length) // 1024} KB > {limit // 1024} KB")
+        if r.status_code == 304 or r.status_code >= 400:
+            return r, b""
+        n = 0
+        async for chunk in r.aiter_bytes():
+            n += len(chunk)
+            if n > limit:
+                raise FeedTooLarge(f"cuerpo > {limit // 1024} KB")
+            chunks.append(chunk)
+    return r, b"".join(chunks)
 
 
 class RSSConnector:
@@ -107,7 +166,11 @@ class RSSConnector:
             r = await client.get(base, headers={"Accept": "text/html"})
             if r.status_code < 400 and "html" in r.headers.get("content-type", ""):
                 candidates.extend(feed_links_from_html(r.text[:400_000], str(r.url)))
-        except (httpx.HTTPError, ValueError):
+        except (
+            httpx.HTTPError,
+            httpx.InvalidURL,
+            ValueError,
+        ):  # InvalidURL no hereda de ninguna de las otras
             pass
         for p in COMMON_FEED_PATHS:
             candidates.append(urljoin(base + "/", p.lstrip("/")))
@@ -127,7 +190,7 @@ class RSSConnector:
                 parsed = parse_feed(r.content)
                 if is_valid_feed(parsed):
                     valid.append(str(r.url))
-            except (httpx.HTTPError, ValueError):
+            except (httpx.HTTPError, httpx.InvalidURL, ValueError):
                 continue
         return valid
 
@@ -145,12 +208,17 @@ class RSSConnector:
             if source.get("last_modified") and len(feeds) == 1:
                 headers["If-Modified-Since"] = source["last_modified"]
             try:
-                r = await client.get(feed_url, headers=headers)
+                r, body = await get_bounded(client, feed_url, headers)
                 if r.status_code in (403, 406, 429):
                     # algunos servidores rechazan agentes desconocidos: segundo intento con UA de navegador
-                    r = await client.get(feed_url, headers={**headers, "User-Agent": BROWSER_UA})
-            except httpx.HTTPError as e:  # red, timeout, TLS
-                errors.append(f"{feed_url}: {type(e).__name__}")
+                    r, body = await get_bounded(client, feed_url, {**headers, "User-Agent": BROWSER_UA})
+            except (
+                httpx.HTTPError,
+                httpx.InvalidURL,
+                FeedTooLarge,
+            ) as e:  # red, timeout, TLS, URL rota, tamaño
+                detail = f": {e}" if isinstance(e, FeedTooLarge) else ""
+                errors.append(f"{feed_url}: {type(e).__name__}{detail}")
                 continue
             result.status = r.status_code
             result.feed_url = feed_url
@@ -160,15 +228,17 @@ class RSSConnector:
             if r.status_code >= 400:
                 errors.append(f"{feed_url}: HTTP {r.status_code}")
                 continue
-            parsed = parse_feed(r.content)
+            # feedparser es Python puro y puede tardar segundos: fuera del hilo que sirve la API
+            parsed = await asyncio.to_thread(parse_feed, body)
             if not is_valid_feed(parsed):
                 errors.append(f"{feed_url}: sin entradas")
                 continue
             result.etag = r.headers.get("etag") or result.etag
             result.last_modified = r.headers.get("last-modified") or result.last_modified
             feed_lang = _lang_code(parsed.feed.get("language"))
+            final_url = str(r.url)
             for e in parsed.entries[:120]:
-                link = e.get("link") or ""
+                link = resolve_link(e.get("link"), final_url, source.get("domain"))
                 if not link:
                     continue
                 content = ""
@@ -209,6 +279,8 @@ class RSSConnector:
         title = (item.title or "").strip()
         if not title or not item.url:
             return None
+        if urlsplit(item.url).scheme not in ("http", "https"):
+            return None  # document.url es UNIQUE: un enlace relativo colisionaría entre medios distintos
         lede = truncate(clean_html(item.summary), 600)
         text = clean_html(item.content) if item.content else ""
         if not text or len(text) < len(lede):

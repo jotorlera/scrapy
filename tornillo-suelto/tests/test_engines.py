@@ -557,7 +557,9 @@ def test_exposure_alert_for_business_unit_explains_channel(seeded):
     )
     alerts = evaluate_event(seeded, "ex1")
     assert {a["channel"] for a in alerts} == {"regulatory", "tax"}
-    assert all("Fit Generation" in a["business_name"] and 0.6 <= a["confidence"] <= 0.95 for a in alerts)
+    assert all(
+        "Formación de pruebas" in a["business_name"] and 0.6 <= a["confidence"] <= 0.95 for a in alerts
+    )
     assert all("canal" in a["explanation"] and "Jurisdicción coincide" in a["explanation"] for a in alerts)
     reg = next(a for a in alerts if a["channel"] == "regulatory")
     assert "ley" in reg["explanation"] and "formación profesional" in reg["explanation"]

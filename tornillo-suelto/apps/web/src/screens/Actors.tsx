@@ -37,7 +37,7 @@ function MentionsChart({ docs, days = 30 }: { docs: ActorDetail['documents']; da
     <svg viewBox={`0 0 ${w} ${h + 16}`} className="graph-svg" role="img" aria-label="Menciones por día">
       {series.map(([day, v], i) => (
         <g key={day}>
-          <rect x={i * bw + 1} y={h - (v / max) * (h - 4)} width={Math.max(1, bw - 2)} height={(v / max) * (h - 4)} fill={v ? 'var(--c-black)' : 'var(--c-line)'}>
+          <rect x={i * bw + 1} y={h - (v / max) * (h - 4)} width={Math.max(1, bw - 2)} height={(v / max) * (h - 4)} fill={v ? 'var(--c-ink)' : 'var(--c-line)'}>
             <title>
               {day}: {v}
             </title>
@@ -70,7 +70,7 @@ function CoMentions({ center, items }: { center: string; items: ActorDetail['co_
         return (
           <g key={it.id} className="node" style={{ cursor: 'pointer' }} onClick={() => nav(`/actores/${it.id}`)}>
             <line x1={cx} y1={cy} x2={x} y2={y} stroke="var(--c-muted)" strokeWidth={0.6 + (it.n / max) * 3} />
-            <circle cx={x} cy={y} r={5 + (it.n / max) * 8} fill="var(--c-accent)" stroke="var(--c-black)" />
+            <circle cx={x} cy={y} r={5 + (it.n / max) * 8} fill="var(--c-accent)" stroke="var(--c-ink)" />
             <text x={x} y={y + 22} textAnchor="middle" fontSize="10" fill="var(--c-text)">
               {it.name.length > 18 ? `${it.name.slice(0, 17)}…` : it.name}
             </text>
@@ -80,7 +80,7 @@ function CoMentions({ center, items }: { center: string; items: ActorDetail['co_
           </g>
         )
       })}
-      <circle cx={cx} cy={cy} r={16} fill="var(--c-black)" />
+      <circle cx={cx} cy={cy} r={16} fill="var(--c-ink)" />
       <text x={cx} y={cy + 32} textAnchor="middle" fontSize="11" fontWeight="700" fill="var(--c-text)">
         {center}
       </text>

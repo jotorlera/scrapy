@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
+import time
+
+import httpx
+
 from atlas_core.connectors.base import RawItem
-from atlas_core.connectors.rss import RSSConnector, feed_links_from_html, is_valid_feed, parse_feed
-from atlas_core.util import canonicalize_url, clean_html, split_sentences
+from atlas_core.connectors.rss import (
+    RSSConnector,
+    feed_links_from_html,
+    is_valid_feed,
+    parse_feed,
+    resolve_link,
+)
+from atlas_core.db import now_iso
+from atlas_core.util import canonicalize_url, clean_html, split_sentences, to_iso
 
 FEED = """<?xml version="1.0"?><rss version="2.0"><channel><title>Diario Test</title><language>es-ES</language>
 <item><title>El BCE mantiene los tipos en el 2%</title><link>https://diario.test/bce?utm_source=rss&amp;id=7</link>
@@ -34,6 +45,67 @@ def test_parse_and_normalize_feed_item():
     assert "Lagarde afirmó" in doc.lede and "<p>" not in doc.lede and "x()" not in doc.lede
     assert doc.kind == "article" and doc.lang == "es" and doc.content_hash
     assert conn.normalize(source, RawItem(url="https://diario.test/vacio", title="")) is None
+    # defensa final: un enlace relativo nunca llega a document.url (UNIQUE entre medios)
+    assert conn.normalize(source, RawItem(url="/article/1", title="Titular")) is None
+
+
+def test_to_iso_struct_time_is_utc_whatever_the_local_timezone(monkeypatch):
+    """feedparser entrega struct_time ya en UTC; con mktime (hora local) cada fecha se desplazaba 1-2 h fuera de UTC."""
+    monkeypatch.setenv("TZ", "Europe/Madrid")
+    time.tzset()
+    try:
+        assert to_iso(time.gmtime(1790000000)) == "2026-09-21T14:13:20+00:00"
+        e = parse_feed(FEED).entries[0]
+        assert to_iso(e.published_parsed) == to_iso(e.published) == "2026-09-28T10:00:00+00:00"
+    finally:
+        monkeypatch.undo()
+        time.tzset()
+
+
+MIXED_LINKS_FEED = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>TRT</title>
+<item><title>Ruta absoluta</title><link>/article/1</link></item>
+<item><title>Host de la fuente sin esquema</title><link>www.trtworld.com/article/2</link></item>
+<item><title>Relativo al feed</title><link>rel/news.html</link></item>
+<item><title>Sin esquema y no es un host propio</title><link>news.html</link></item>
+<item><title>No http</title><link>mailto:redaccion@trtworld.com</link></item>
+</channel></rss>"""
+
+
+def test_resolve_link_cases():
+    base = "https://www.trtworld.com/feed/rss.xml"
+    assert resolve_link("/article/1", base) == "https://www.trtworld.com/article/1"
+    assert resolve_link("rel/news.html", base) == "https://www.trtworld.com/feed/rel/news.html"
+    assert (
+        resolve_link("news.html", base) == "https://www.trtworld.com/feed/news.html"
+    )  # no 'https://news.html'
+    assert resolve_link("https://other.test/x?a=1", base) == "https://other.test/x?a=1"
+    # caso real (bea): host sin esquema anclado al dominio de la fuente, no al del feed
+    assert (
+        resolve_link("www.bea.gov/news/2026/gdp", "https://apps.bea.gov/rss/rss.xml", "bea.gov")
+        == "https://www.bea.gov/news/2026/gdp"
+    )
+    assert resolve_link("mailto:a@b.test", base) is None
+    assert resolve_link("", base) is None and resolve_link(None, base) is None
+
+
+async def test_fetch_resolves_relative_links_against_the_feed_url():
+    def handler(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=MIXED_LINKS_FEED, headers={"content-type": "application/rss+xml"})
+
+    source = {
+        "id": "s1",
+        "type": "broadcaster",
+        "domain": "trtworld.com",
+        "feeds": ["https://www.trtworld.com/feed/rss.xml"],
+    }
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        res = await RSSConnector().fetch(source, client)
+    assert res.ok and [it.url for it in res.items] == [
+        "https://www.trtworld.com/article/1",
+        "https://www.trtworld.com/article/2",
+        "https://www.trtworld.com/feed/rel/news.html",
+        "https://www.trtworld.com/feed/news.html",
+    ]
 
 
 def test_kind_by_source_type():
@@ -70,8 +142,8 @@ def test_llm_budget_state_without_key(db, monkeypatch):
     assert st["daily_cap_usd"] == 10 and st["spent_today_usd"] == 0 and not st["hard_stop"]
     with db.tx() as conn:
         conn.execute(
-            "INSERT INTO llm_call(at, module, cost_usd, ok) VALUES (datetime('now'), 'test', 9.0, 1)"
-        )
+            "INSERT INTO llm_call(at, module, cost_usd, ok) VALUES (?, 'test', 9.0, 1)", (now_iso(),)
+        )  # mismo formato ISO que el resto de columnas de fecha (nunca datetime de SQLite)
     st = llm.budget_state()
     assert st["pause_noncritical"] and not st["hard_stop"]
     try:

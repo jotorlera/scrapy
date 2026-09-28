@@ -12,7 +12,7 @@ import re
 from typing import Any
 
 from ..config_loader import countries_config, profile_config
-from ..db import Database, dumps, loads, new_id, now_iso
+from ..db import Database, dumps, loads, new_id, now_iso, since_iso
 
 SEED_VARIABLES = [
     ("MONEY", "policy_rate", "%", {"type": "abs", "value": 0.25}, "Banco central (comunicado)"),
@@ -281,7 +281,7 @@ def recent_deltas(db: Database, hours: int = 168, limit: int = 40) -> list[dict[
                   d.url AS source_url, d.title AS source_title
            FROM state_delta sd JOIN state_variable sv ON sv.id = sd.variable_id
            LEFT JOIN event e ON e.id = sd.event_id LEFT JOIN document d ON d.id = sd.source_doc_id
-           WHERE sd.detected_at >= datetime('now', ?) ORDER BY sd.detected_at DESC LIMIT ?""",
-        (f"-{hours} hours", limit),
+           WHERE sd.detected_at >= ? ORDER BY sd.detected_at DESC LIMIT ?""",
+        (since_iso(hours=hours), limit),
     )
     return [dict(r) for r in rows]

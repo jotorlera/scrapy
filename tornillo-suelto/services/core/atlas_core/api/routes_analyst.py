@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from ..config_loader import attention_level, causal_channels_config, countries_config
-from ..db import loads
+from ..db import loads, since_iso
 from ..engines.archive import analogs, compare_cases
 from ..engines.claims import claims_for_event
 from ..engines.coverage import BLOC_ORDER, IDEOLOGY_ORDER
@@ -16,7 +16,7 @@ from ..engines.diff import diff_documents
 from ..engines.lexicon import fightin_words
 from ..engines.state import recent_deltas
 from ..gazetteer import countries as gazetteer_countries
-from .deps import db, doc_out, event_out
+from .deps import DaysQ, HoursQ, LimitQ, OffsetQ, db, doc_out, event_out
 
 router = APIRouter()
 
@@ -29,11 +29,12 @@ def radar(
     domain: str | None = None,
     country: str | None = None,
     min_materiality: float = 0,
-    limit: int = 60,
+    limit: LimitQ = 60,
 ) -> dict[str, Any]:
     d = db()
-    sql = "SELECT * FROM event WHERE status != 'merged' AND last_update_at >= datetime('now', ?) AND materiality >= ?"
-    params: list[Any] = [f"-{hours} hours", min_materiality]
+    since = since_iso(hours=hours)
+    sql = "SELECT * FROM event WHERE status != 'merged' AND last_update_at >= ? AND materiality >= ?"
+    params: list[Any] = [since, min_materiality]
     if domain:
         sql += " AND domain = ?"
         params.append(domain)
@@ -46,22 +47,18 @@ def radar(
     deltas = recent_deltas(d, hours=max(hours, 72))
     counts = {
         "events": d.scalar(
-            "SELECT COUNT(*) FROM event WHERE status != 'merged' AND last_update_at >= datetime('now', ?)",
-            (f"-{hours} hours",),
-            0,
+            "SELECT COUNT(*) FROM event WHERE status != 'merged' AND last_update_at >= ?", (since,), 0
         ),
-        "documents": d.scalar(
-            "SELECT COUNT(*) FROM document WHERE fetched_at >= datetime('now', ?)", (f"-{hours} hours",), 0
-        ),
+        "documents": d.scalar("SELECT COUNT(*) FROM document WHERE fetched_at >= ?", (since,), 0),
         "sources_ok": d.scalar(
-            "SELECT COUNT(*) FROM source WHERE last_ok_at >= datetime('now', '-1 day')", (), 0
+            "SELECT COUNT(*) FROM source WHERE last_ok_at >= ?", (since_iso(hours=24),), 0
         ),
     }
     by_domain = {
         r["domain"]: r["n"]
         for r in d.all(
-            "SELECT domain, COUNT(*) n FROM event WHERE status != 'merged' AND last_update_at >= datetime('now', ?) GROUP BY domain",
-            (f"-{hours} hours",),
+            "SELECT domain, COUNT(*) n FROM event WHERE status != 'merged' AND last_update_at >= ? GROUP BY domain",
+            (since,),
         )
     }
     return {"events": events, "deltas": deltas, "counts": counts, "by_domain": by_domain, "hours": hours}
@@ -69,16 +66,16 @@ def radar(
 
 @router.get("/events")
 def list_events(
-    hours: int = 168,
-    limit: int = 100,
+    hours: HoursQ = 168,
+    limit: LimitQ = 100,
     q: str | None = None,
     country: str | None = None,
     domain: str | None = None,
-    offset: int = 0,
+    offset: OffsetQ = 0,
 ) -> dict[str, Any]:
     d = db()
-    sql = "SELECT * FROM event WHERE status != 'merged' AND last_update_at >= datetime('now', ?)"
-    params: list[Any] = [f"-{hours} hours"]
+    sql = "SELECT * FROM event WHERE status != 'merged' AND last_update_at >= ?"
+    params: list[Any] = [since_iso(hours=hours)]
     if q:
         sql += " AND title_neutral LIKE ?"
         params.append(f"%{q}%")
@@ -152,8 +149,8 @@ def event_detail(event_id: str) -> dict[str, Any]:
     related = []
     if keys:
         cand = d.all(
-            "SELECT * FROM event WHERE id != ? AND status != 'merged' AND last_update_at >= datetime('now', '-30 days') ORDER BY last_update_at DESC LIMIT 400",
-            (event_id,),
+            "SELECT * FROM event WHERE id != ? AND status != 'merged' AND last_update_at >= ? ORDER BY last_update_at DESC LIMIT 400",
+            (event_id, since_iso(days=30)),
         )
         for c in cand:
             ck = set(loads(c["entity_keys"], []))
@@ -256,6 +253,8 @@ def flag_event(event_id: str, body: FlagIn) -> dict[str, Any]:
     if body.flag not in ("important", "noise", ""):
         raise HTTPException(400, "flag debe ser important|noise|''")
     d = db()
+    if not d.one("SELECT 1 FROM event WHERE id = ?", (event_id,)):
+        raise HTTPException(404, "evento no encontrado")
     with d.tx() as conn:
         conn.execute("UPDATE event SET user_flag = ? WHERE id = ?", (body.flag or None, event_id))
     return {"ok": True}
@@ -326,16 +325,16 @@ def prism(event_id: str) -> dict[str, Any]:
 
 @router.get("/primaries")
 def primaries(
-    hours: int = 168,
+    hours: HoursQ = 168,
     source_slug: str | None = None,
     country: str | None = None,
     kind: str | None = None,
-    limit: int = 150,
+    limit: LimitQ = 150,
 ) -> dict[str, Any]:
     d = db()
     sql = """SELECT d.*, s.name AS source_name, s.slug AS source_slug, s.type AS source_type, s.country AS source_country, s.tier
-             FROM document d JOIN source s ON s.id = d.source_id WHERE s.tier = 1 AND d.fetched_at >= datetime('now', ?)"""
-    params: list[Any] = [f"-{hours} hours"]
+             FROM document d JOIN source s ON s.id = d.source_id WHERE s.tier = 1 AND d.fetched_at >= ?"""
+    params: list[Any] = [since_iso(hours=hours)]
     if source_slug:
         sql += " AND s.slug = ?"
         params.append(source_slug)
@@ -352,8 +351,9 @@ def primaries(
         dict(r)
         for r in d.all(
             """SELECT s.slug, s.name, s.country, s.type, COUNT(d.id) AS n, MAX(d.published_at) AS last
-           FROM source s LEFT JOIN document d ON d.source_id = s.id AND d.fetched_at >= datetime('now', '-30 days')
-           WHERE s.tier = 1 AND s.active = 1 GROUP BY s.id ORDER BY n DESC"""
+           FROM source s LEFT JOIN document d ON d.source_id = s.id AND d.fetched_at >= ?
+           WHERE s.tier = 1 AND s.active = 1 GROUP BY s.id ORDER BY n DESC""",
+            (since_iso(days=30),),
         )
     ]
     lineages = [
@@ -427,6 +427,8 @@ def markets() -> dict[str, Any]:
 @router.post("/markets/prediction/{market_id:path}/follow")
 def follow_market(market_id: str, follow: bool = True) -> dict[str, Any]:
     d = db()
+    if not d.one("SELECT 1 FROM prediction_market WHERE id = ?", (market_id,)):
+        raise HTTPException(404, "mercado no encontrado")
     with d.tx() as conn:
         conn.execute(
             "UPDATE prediction_market SET followed = ? WHERE id = ?", (1 if follow else 0, market_id)
@@ -441,7 +443,7 @@ def list_countries() -> dict[str, Any]:
     out = []
     counts = {}
     for r in d.all(
-        "SELECT countries FROM event WHERE status != 'merged' AND last_update_at >= datetime('now', '-7 days')"
+        "SELECT countries FROM event WHERE status != 'merged' AND last_update_at >= ?", (since_iso(days=7),)
     ):
         for c in loads(r["countries"], []):
             counts[c] = counts.get(c, 0) + 1
@@ -463,7 +465,7 @@ def list_countries() -> dict[str, Any]:
 
 
 @router.get("/countries/{iso2}")
-def country_sheet(iso2: str, days: int = 7) -> dict[str, Any]:
+def country_sheet(iso2: str, days: DaysQ = 7) -> dict[str, Any]:
     d = db()
     iso2 = iso2.upper()
     c = gazetteer_countries().get(iso2)
@@ -472,8 +474,8 @@ def country_sheet(iso2: str, days: int = 7) -> dict[str, Any]:
     events = [
         event_out(r)
         for r in d.all(
-            "SELECT * FROM event WHERE countries LIKE ? AND status != 'merged' AND last_update_at >= datetime('now', ?) ORDER BY materiality DESC LIMIT 40",
-            (f'%"{iso2}"%', f"-{days} days"),
+            "SELECT * FROM event WHERE countries LIKE ? AND status != 'merged' AND last_update_at >= ? ORDER BY materiality DESC LIMIT 40",
+            (f'%"{iso2}"%', since_iso(days=days)),
         )
     ]
     deltas = [
@@ -545,12 +547,12 @@ def country_sheet(iso2: str, days: int = 7) -> dict[str, Any]:
 
 
 @router.get("/actors")
-def actors(q: str | None = None, kind: str | None = None, limit: int = 60) -> dict[str, Any]:
+def actors(q: str | None = None, kind: str | None = None, limit: LimitQ = 60) -> dict[str, Any]:
     d = db()
     sql = """SELECT e.id, e.kind, e.name, e.country, e.wikidata_qid, e.attributes,
-                    (SELECT COUNT(*) FROM document_entity de JOIN document doc ON doc.id = de.document_id WHERE de.entity_id = e.id AND doc.fetched_at >= datetime('now','-7 days')) AS mentions_7d
+                    (SELECT COUNT(*) FROM document_entity de JOIN document doc ON doc.id = de.document_id WHERE de.entity_id = e.id AND doc.fetched_at >= ?) AS mentions_7d
              FROM entity e WHERE 1=1"""
-    params: list[Any] = []
+    params: list[Any] = [since_iso(days=7)]
     if q:
         sql += " AND (e.name LIKE ? OR e.aliases LIKE ?)"
         params += [f"%{q}%", f"%{q.lower()}%"]
@@ -568,7 +570,7 @@ def actors(q: str | None = None, kind: str | None = None, limit: int = 60) -> di
 
 
 @router.get("/actors/{entity_id}")
-def actor(entity_id: str, days: int = 30) -> dict[str, Any]:
+def actor(entity_id: str, days: DaysQ = 30) -> dict[str, Any]:
     d = db()
     e = d.one("SELECT * FROM entity WHERE id = ?", (entity_id,))
     if not e:
@@ -580,8 +582,8 @@ def actor(entity_id: str, days: int = 30) -> dict[str, Any]:
         doc_out(r)
         for r in d.all(
             """SELECT d.*, s.name AS source_name, s.tier, s.ideology_label, s.region_bloc, de.salience FROM document_entity de JOIN document d ON d.id = de.document_id
-           JOIN source s ON s.id = d.source_id WHERE de.entity_id = ? AND d.fetched_at >= datetime('now', ?) ORDER BY d.published_at DESC LIMIT 80""",
-            (entity_id, f"-{days} days"),
+           JOIN source s ON s.id = d.source_id WHERE de.entity_id = ? AND d.fetched_at >= ? ORDER BY d.published_at DESC LIMIT 80""",
+            (entity_id, since_iso(days=days)),
         )
     ]
     events = [
@@ -604,8 +606,8 @@ def actor(entity_id: str, days: int = 30) -> dict[str, Any]:
         dict(r)
         for r in d.all(
             """SELECT e2.id, e2.name, e2.kind, COUNT(*) n FROM document_entity a JOIN document_entity b ON a.document_id = b.document_id AND a.entity_id != b.entity_id
-           JOIN entity e2 ON e2.id = b.entity_id JOIN document d ON d.id = a.document_id WHERE a.entity_id = ? AND d.fetched_at >= datetime('now', ?) GROUP BY e2.id ORDER BY n DESC LIMIT 15""",
-            (entity_id, f"-{days} days"),
+           JOIN entity e2 ON e2.id = b.entity_id JOIN document d ON d.id = a.document_id WHERE a.entity_id = ? AND d.fetched_at >= ? GROUP BY e2.id ORDER BY n DESC LIMIT 15""",
+            (entity_id, since_iso(days=days)),
         )
     ]
     return {
