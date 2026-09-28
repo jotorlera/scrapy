@@ -1,0 +1,77 @@
+# ATLAS — Perfil del usuario
+# PRIVADO: este archivo está en .gitignore. Se carga en la DB local; nunca se envía completo a un LLM.
+# Revisa y completa los campos marcados con TODO.
+
+usuario:
+  nombre: "José Francisco Tornero-Aguilera"
+  firma_trabajos: "Dr. José Francisco Tornero-Aguilera"
+  idiomas: [es, en]
+  zona_horaria: "Europe/Monaco"   # TODO: ajustar si viajas; el Brief usa esta zona
+  hora_brief: "07:00"
+  email_brief: null                 # TODO: opcional
+
+estudios:
+  grado: "Filosofía, Política, Economía y Relaciones Internacionales"
+  universidad: "Universidad de las Hespérides (modalidad virtual)"
+  asignaturas_en_curso:
+    - nombre: "Filosofía Política I"
+      bibliografia:
+        - "Hayek — Los fundamentos de la libertad"
+        - "Shorten — Contemporary Political Theory"
+        - "Strauss — ¿Qué es filosofía política?"
+    - nombre: "Ciencia Política I: Corrientes e Ideologías"
+      bibliografia:
+        - "Caminal — Manual de Ciencia Política"
+        - "Marshall — Prisioneros de la geografía"
+        - "Savater — Política para Amador"
+        - "Maquiavelo — El Príncipe"
+        - "Hobbes — Leviatán (2.ª parte)"
+        - "Montesquieu — El espíritu de las leyes"
+        - "Pettit — De la República a la Democracia"
+        - "Kant — La paz perpetua"
+  intereses_teoricos_semilla:
+    - "Renta básica universal (Van Parijs; objeción de reciprocidad; Atkinson; Hayek y el suelo mínimo)"
+    - "Libertad negativa, positiva y como no dominación (Berlin, Pettit)"
+    - "Realismo frente a liberalismo institucional en RR. II."
+  conceptos_a_etiquetar:   # el sistema etiqueta eventos con estos conceptos (ampliable)
+    filosofia: [libertad negativa, libertad positiva, no dominación, contrato social, justicia distributiva, legitimidad, soberanía, guerra justa, paternalismo, reciprocidad]
+    ciencia_politica: [legitimidad institucional, separación de poderes, populismo, polarización, clivajes, sistema de partidos, federalismo, estado de derecho]
+    economia: [externalidades, incentivos, trilema de Mundell, curva de Phillips, dominancia fiscal, equivalencia ricardiana, ventaja comparativa, riesgo moral]
+    rrii: [dilema de seguridad, equilibrio de poder, disuasión, interdependencia compleja, poder blando, geografía y poder, hegemonía, trampa de Tucídides]
+
+investigacion:
+  areas: [fisiología del ejercicio, epidemiología, envejecimiento, salud pediátrica]
+  nicho_estrategico: "Cruce salud × política: política sanitaria, economía del envejecimiento, geopolítica de la salud (OMS, EMA, FDA, cadenas de suministro farmacéutico)"
+  vigilar_huecos_de_investigacion: true
+
+negocios:   # TODO: revisar, completar y corregir. Base para MANDO (exposición, radar regulatorio, sector)
+  - nombre: "Omnivorous Monaco Biotech"
+    sectores: [biotecnología, salud]
+    jurisdicciones: [MC, EU]
+    regulacion_relevante: [datos de salud (RGPD/EHDS), productos sanitarios, ensayos clínicos]   # TODO
+    palabras_clave: []      # TODO
+  - nombre: "Fit Generation (formación y Research Institute)"
+    sectores: [formación, fitness, investigación aplicada]
+    jurisdicciones: [AD, ES, EU]
+    regulacion_relevante: [formación profesional, fiscalidad Andorra/España]   # TODO
+    palabras_clave: []
+  - nombre: "App de salud y bienestar (en desarrollo)"
+    sectores: [salud digital]
+    jurisdicciones: [EU]    # TODO: mercados objetivo
+    regulacion_relevante: [AI Act, productos sanitarios software (MDR), RGPD, EHDS]
+    palabras_clave: []
+  - nombre: "Marca de streetwear y coleccionables de buceo"
+    sectores: [consumo, textil]
+    jurisdicciones: []      # TODO
+    regulacion_relevante: []
+    palabras_clave: []
+
+negocios_contexto:
+  divisas_relevantes: [EUR, USD]   # TODO
+  colaboraciones: ["Universidad ESAN (Lima, Perú) — contrato de investigador externo"]
+
+preferencias_atlas:
+  paises_nivel_A_extra: [MC, AD]   # además de los de config/paises.yaml
+  tope_coste_diario_usd: 10
+  modo_inicio: ANALISTA
+  tema: oscuro

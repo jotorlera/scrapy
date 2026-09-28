@@ -1,0 +1,17 @@
+# ATLAS — Canales causales semilla (docs/07 §7). Editables desde la UI. Signo: + mismo sentido, − sentido opuesto.
+# `ref` = referencia académica o institucional orientativa (el agente debe verificar/actualizar).
+channels:
+  - {from: brent_price, to: headline_inflation_importers, sign: "+", lag: "1-3m", ref: "Literatura de pass-through energético (BCE, FMI)"}
+  - {from: headline_inflation, to: policy_rate_expectations, sign: "+", lag: "0-6m", ref: "Regla de Taylor"}
+  - {from: policy_rate_expectations, to: growth_equity_valuations, sign: "−", lag: "0-1m"}
+  - {from: policy_rate_expectations, to: currency_strength, sign: "+", lag: "0-1m", ref: "Paridad de intereses"}
+  - {from: chokepoint_disruption, to: freight_rates, sign: "+", lag: "0-2w"}
+  - {from: freight_rates, to: importer_margins, sign: "−", lag: "1-3m"}
+  - {from: sanctions_on_supplier, to: input_prices, sign: "+", lag: "0-3m"}
+  - {from: sovereign_risk, to: sovereign_spread, sign: "+", lag: "0-1w"}
+  - {from: sovereign_spread, to: domestic_bank_equities, sign: "−", lag: "0-1w", ref: "Nexo soberano-bancario"}
+  - {from: global_risk_aversion, to: safe_havens_usd_chf_jpy_gold, sign: "+", lag: "0-1d"}
+  - {from: global_risk_aversion, to: em_currencies, sign: "−", lag: "0-1d"}
+  - {from: conflict_escalation_major_producer, to: commodity_price_of_that_producer, sign: "+", lag: "0-1w"}
+  - {from: regulatory_tightening_sector, to: sector_margins, sign: "−", lag: "3-24m"}
+  - {from: health_emergency_declaration, to: pharma_diagnostics_demand, sign: "+", lag: "0-3m"}

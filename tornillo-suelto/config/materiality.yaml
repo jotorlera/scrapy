@@ -1,0 +1,15 @@
+# ATLAS — Pesos iniciales de materialidad (docs/07 §2). Se reajustan con el feedback del usuario ("importante"/"ruido").
+beta0: -2.0
+weights:
+  delta_state: 1.4
+  power: 0.9
+  irreversibility: 1.1
+  breadth: 0.6
+  primary_document: 0.5
+  novelty: 0.4
+  user_relevance: 0.5      # acotado: no puede aportar más de +10 puntos
+  virality_only_penalty: 0.8
+thresholds:
+  radar_top: 40
+  agent_analysis: 60
+  push_alert: 80

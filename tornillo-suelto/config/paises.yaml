@@ -1,0 +1,10 @@
+# ATLAS — Niveles de atención por país (docs/03 §5)
+# A = profundidad (ficha completa, primarias vigiladas, PRISMA local, deltas diarios)
+# B = seguimiento (ficha estándar, agencias + 2-4 medios nacionales)
+# C = vigilancia (GDELT + ACLED + agencias internacionales; solo alertas de materialidad alta). Por defecto, el resto del mundo.
+
+A: [ES, US, CN, RU, UA, TR, FR, DE, GB, IT, IL, IR, SA, IN, BR, MX, AR, MC, AD]
+B: [PT, NL, BE, PL, SE, GR, CH, AT, IE, CA, JP, KR, TW, AU, ID, PK, EG, AE, QA, MA, DZ, NG, ZA, ET, KE, CO, CL, PE, VE, SY, LB, IQ, AZ, AM, GE, KZ, RS, HU, RO]
+C: resto
+
+bloques_supranacionales: [EU, NATO, G7, G20, BRICS, ASEAN, AU, MERCOSUR, OPEC_PLUS, SCO, GCC, UN]

@@ -1,0 +1,37 @@
+{
+  "_comment": "Plantilla de servidores MCP para desarrollo con Claude Code. Copiar a .mcp.json en la raíz cuando los servidores estén instalados. Los atlas-* se crean en la fase 2; comandos orientativos.",
+  "mcpServers": {
+    "openbb": {
+      "command": "openbb-mcp",
+      "args": ["--transport", "stdio"]
+    },
+    "atlas-news": {
+      "command": "uv",
+      "args": ["run", "--directory", "services/core", "python", "-m", "atlas_core.mcp.news"]
+    },
+    "atlas-claims": {
+      "command": "uv",
+      "args": ["run", "--directory", "services/core", "python", "-m", "atlas_core.mcp.claims"]
+    },
+    "atlas-graph": {
+      "command": "uv",
+      "args": ["run", "--directory", "services/core", "python", "-m", "atlas_core.mcp.graph"]
+    },
+    "atlas-state": {
+      "command": "uv",
+      "args": ["run", "--directory", "services/core", "python", "-m", "atlas_core.mcp.state"]
+    },
+    "atlas-forecast": {
+      "command": "uv",
+      "args": ["run", "--directory", "services/core", "python", "-m", "atlas_core.mcp.forecast"]
+    },
+    "atlas-primary": {
+      "command": "uv",
+      "args": ["run", "--directory", "services/core", "python", "-m", "atlas_core.mcp.primary"]
+    },
+    "atlas-library": {
+      "command": "uv",
+      "args": ["run", "--directory", "services/core", "python", "-m", "atlas_core.mcp.library"]
+    }
+  }
+}

@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/feeds_verified.yaml
+data/feeds_alt.yaml
+data/cache/
+.env
+apps/web/node_modules/
+apps/web/dist/
+references/
+*.egg-info/

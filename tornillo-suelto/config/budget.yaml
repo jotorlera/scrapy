@@ -1,0 +1,15 @@
+# ATLAS — Presupuesto de LLM (docs/12 §3)
+daily_cap_usd: 10
+pause_noncritical_at: 0.8     # fracción del tope
+allocation:                   # fracción del tope diario
+  bulk_extraction: 0.40
+  event_analysis: 0.30
+  brief_and_weekly: 0.10
+  forecasting: 0.10
+  on_demand: 0.10
+limits:
+  max_events_analyzed_per_day: 25
+  materiality_threshold_for_analysis: 60
+  forecast_ensemble_size: 5
+  simulation_max_usd_per_run: 2.0
+  show_estimated_cost_before_on_demand: true
