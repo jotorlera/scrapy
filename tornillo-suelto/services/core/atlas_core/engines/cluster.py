@@ -151,6 +151,9 @@ class ClusterIndex:
                     ev.countries.append(c)
             if ts and (parse_iso(ev.last_update_at) or ts) < ts:
                 ev.last_update_at = ts.isoformat()
+            # el lote se procesa del más reciente al más antiguo: el primer documento visto no es el primero publicado
+            if ts and (parse_iso(ev.first_seen_at) or ts) > ts:
+                ev.first_seen_at = ts.isoformat()
             for t in topics:
                 if t not in ev.topics:
                     ev.topics.append(t)
@@ -228,13 +231,14 @@ class ClusterIndex:
                 else:
                     conn.execute(
                         """UPDATE event SET centroid=?, n_docs=?, entity_keys=?, countries=?, geo=COALESCE(geo, ?),
-                           last_update_at=? WHERE id=?""",
+                           first_seen_at=COALESCE(?, first_seen_at), last_update_at=? WHERE id=?""",
                         (
                             vec_to_blob(ev.centroid),
                             ev.n_docs,
                             dumps(sorted(ev.entity_keys)),
                             dumps(ev.countries),
                             dumps(geo),
+                            ev.first_seen_at,
                             ev.last_update_at,
                             ev.id,
                         ),
@@ -246,6 +250,19 @@ class ClusterIndex:
 
 
 MERGE_THETA_EXTRA = 0.08
+
+
+def _earliest(*stamps: str | None) -> str | None:
+    """La más antigua de varias fechas ISO (ignora None e ilegibles); devuelve la cadena original."""
+    parsed = [(parse_iso(s), s) for s in stamps if s]
+    parsed = [(d, s) for d, s in parsed if d]
+    return min(parsed)[1] if parsed else None
+
+
+def _latest(*stamps: str | None) -> str | None:
+    parsed = [(parse_iso(s), s) for s in stamps if s]
+    parsed = [(d, s) for d, s in parsed if d]
+    return max(parsed)[1] if parsed else None
 
 
 def consolidate_events(db: Database, hours: int = 48) -> dict[str, int]:
@@ -325,22 +342,14 @@ def consolidate_events(db: Database, hours: int = 48) -> dict[str, int]:
                 for c in loads(d["countries"], []):
                     if c not in countries_all:
                         countries_all.append(c)
-            w_keys = set(
-                loads(
-                    conn.execute("SELECT entity_keys FROM event WHERE id = ?", (winner,)).fetchone()[
-                        "entity_keys"
-                    ],
-                    [],
-                )
-            )
-            l_keys = set(
-                loads(
-                    conn.execute("SELECT entity_keys FROM event WHERE id = ?", (loser,)).fetchone()[
-                        "entity_keys"
-                    ],
-                    [],
-                )
-            )
+            w_row = conn.execute(
+                "SELECT entity_keys, first_seen_at, last_update_at FROM event WHERE id = ?", (winner,)
+            ).fetchone()
+            l_row = conn.execute(
+                "SELECT entity_keys, first_seen_at, last_update_at FROM event WHERE id = ?", (loser,)
+            ).fetchone()
+            w_keys = set(loads(w_row["entity_keys"], []))
+            l_keys = set(loads(l_row["entity_keys"], []))
             geo = None
             for c in countries_all:
                 if c in cmap:
@@ -348,15 +357,26 @@ def consolidate_events(db: Database, hours: int = 48) -> dict[str, int]:
                     break
             if vecs:
                 centroid = np.mean(np.stack(vecs), axis=0).astype(np.float32)
+                # fechas desde los documentos (como el centroide): el ganador adopta el primer publicado y el
+                # último; en Python porque MIN/MAX escalares de SQLite devuelven NULL si algún argumento es NULL
+                span = conn.execute(
+                    "SELECT MIN(published_at) AS lo, MAX(published_at) AS hi FROM document WHERE event_id = ?",
+                    (winner,),
+                ).fetchone()
+                first_seen = _earliest(w_row["first_seen_at"], l_row["first_seen_at"], span["lo"])
+                last_update = _latest(w_row["last_update_at"], l_row["last_update_at"], span["hi"])
                 conn.execute(
-                    "UPDATE event SET centroid = ?, n_docs = ?, countries = ?, entity_keys = ?, geo = COALESCE(geo, ?), last_update_at = MAX(last_update_at, (SELECT last_update_at FROM event WHERE id = ?)) WHERE id = ?",
+                    """UPDATE event SET centroid = ?, n_docs = ?, countries = ?, entity_keys = ?, geo = COALESCE(geo, ?),
+                       first_seen_at = COALESCE(?, first_seen_at), last_update_at = COALESCE(?, last_update_at)
+                       WHERE id = ?""",
                     (
                         vec_to_blob(centroid),
                         len(docs),
                         dumps(countries_all[:6]),
                         dumps(sorted(w_keys | l_keys)[:12]),
                         dumps(geo),
-                        loser,
+                        first_seen,
+                        last_update,
                         winner,
                     ),
                 )

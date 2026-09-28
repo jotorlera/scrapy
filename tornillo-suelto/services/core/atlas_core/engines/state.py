@@ -153,7 +153,10 @@ def _variable_id(db: Database, scope: str, key: str, create: bool = False) -> st
 
 
 def deltas_from_markets(db: Database) -> int:
-    """MONEY.fx_vs_usd: variación a 7 días desde el histórico de la cinta."""
+    """MONEY.fx_vs_usd: variación en 5 sesiones (≈ 7 días naturales) desde el histórico de la cinta.
+
+    La variable se crea si no existe (como hace deltas_from_event): todo símbolo de FX_SYMBOL_TO_COUNTRY registra
+    observación aunque su país no sea de nivel A (JP), en vez de descartarse en silencio."""
     n = 0
     ts = now_iso()
     for sym, scope in FX_SYMBOL_TO_COUNTRY.items():
@@ -168,7 +171,7 @@ def deltas_from_markets(db: Database) -> int:
         if not prev:
             continue
         pct = (last - prev) / prev * 100.0
-        vid = _variable_id(db, scope, "fx_vs_usd")
+        vid = _variable_id(db, scope, "fx_vs_usd", create=True)
         if not vid:
             continue
         threshold = loads(
@@ -178,7 +181,12 @@ def deltas_from_markets(db: Database) -> int:
             conn.execute(
                 """INSERT OR REPLACE INTO state_observation(variable_id, observed_at, value_num, source_note)
                    VALUES (?,?,?,?)""",
-                (vid, q["observed_at"] or ts, round(pct, 3), f"Yahoo Finance {sym}: variación 7 sesiones"),
+                (
+                    vid,
+                    q["observed_at"] or ts,
+                    round(pct, 3),
+                    f"Yahoo Finance {sym}: variación 5 sesiones (≈7 días)",
+                ),
             )
             if abs(pct) >= float(threshold.get("value", 2.0)):
                 exists = conn.execute(
@@ -199,7 +207,7 @@ def deltas_from_markets(db: Database) -> int:
                             None,
                             ts,
                             round(pct, 2),
-                            f"{sym}: {pct:+.1f}% en 7 sesiones ({direction} frente al USD). Fuente: Yahoo Finance",
+                            f"{sym}: {pct:+.1f}% en 5 sesiones (≈7 días) ({direction} frente al USD). Fuente: Yahoo Finance",
                         ),
                     )
                     n += 1
@@ -224,8 +232,15 @@ def deltas_from_event(db: Database, event_id: str) -> int:
     if not countries:
         return 0
     lead = db.one("SELECT title, lede, id FROM document WHERE id = ?", (ev["lead_document_id"],))
+    if lead is None:
+        lead = db.one(
+            "SELECT title, lede, id FROM document WHERE event_id = ? ORDER BY published_at LIMIT 1",
+            (event_id,),
+        )
+    if lead is None:
+        return 0  # sin documento no hay procedencia (source_doc_id) que mostrar ni que distinguir en materialidad
     # la regla debe cumplirse en el TÍTULO (el cambio es el asunto, no un detalle de la entradilla)
-    text = f"{ev['title_neutral']} {(lead['title'] if lead else '') or ''}"
+    text = f"{ev['title_neutral']} {lead['title'] or ''}"
     n = 0
     ts = now_iso()
     matched = [(dim, key, label) for dim, key, label, rx in CATEGORICAL_RULES if rx.search(text)]
@@ -253,7 +268,7 @@ def deltas_from_event(db: Database, event_id: str) -> int:
                         ts,
                         1.0,
                         f"{scope} · {dim} · {label}: {ev['title_neutral'][:140]}",
-                        lead["id"] if lead else None,
+                        lead["id"],
                     ),
                 )
                 n += 1

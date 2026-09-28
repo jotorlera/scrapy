@@ -110,22 +110,48 @@ _FUTURE_RX = re.compile(
     r"\b(podría|puede que|amenaza con|threatens to|could|may|might|plans to|planea|propone|proposes|estudia|considers|pide|urges|calls for|reclama|quiere|wants)\b",
     re.I,
 )
+# Segmentación propia, sin longitud mínima (util.split_sentences descarta fragmentos < 25 caracteres y un título
+# como «Dimite el ministro.» debe contar).
+_SEG_RX = re.compile(r"(?<=[.!?…;])\s+|\n+")
+# "May" es mes, no modal, cuando va precedido de día o preposición temporal, o seguido de día, año o posesivo.
+_MAY_MONTH_BEFORE = re.compile(
+    r"(?:\b\d{1,2}(?:st|nd|rd|th)?|\b(?:in|on|by|of|for|from|since|until|till|last|next|early|late|mid|between|through|during)-?)\s*$",
+    re.I,
+)
+_MAY_MONTH_AFTER = re.compile(r"^\s*(?:\d{1,2}(?:st|nd|rd|th)?\b|\d{4}\b|['’]s\b)")
 
 
 def _sigmoid(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-x))
 
 
+def _future_marker_positions(segment: str) -> list[int]:
+    out: list[int] = []
+    for m in _FUTURE_RX.finditer(segment):
+        if m.group(0).lower() == "may" and (
+            _MAY_MONTH_BEFORE.search(segment[: m.start()]) or _MAY_MONTH_AFTER.match(segment[m.end() :])
+        ):
+            continue  # mes, no verbo modal
+        out.append(m.start())
+    return out
+
+
 def irreversibility_score(texts: list[str]) -> float:
+    """Máximo peso de un cambio irreversible en los textos. El descuento por futuro/condicional (×0,4) solo se
+    aplica si el marcador aparece ANTES del término y en el mismo segmento («podría dimitir», «could be ousted»);
+    «dimite. La oposición pide elecciones» o «resigns on May 12» no se descuentan."""
     best = 0.0
     for t in texts:
         if not t:
             continue
-        future = bool(_FUTURE_RX.search(t))
-        for w, rx in _IRREVERSIBLE_RX:
-            if rx.search(t):
-                score = w * (0.4 if future else 1.0)
-                best = max(best, score)
+        for seg in _SEG_RX.split(t):
+            marks = _future_marker_positions(seg)
+            for w, rx in _IRREVERSIBLE_RX:
+                m = rx.search(seg)
+                if not m:
+                    continue
+                future = any(p < m.start() for p in marks)
+                best = max(best, w * (0.4 if future else 1.0))
     return min(1.0, best)
 
 
@@ -175,7 +201,18 @@ def compute_materiality(db: Database, event_id: str) -> dict[str, Any]:
     keys = loads(ev["entity_keys"], [])
     texts = [f"{d['title']}. {d['lede'] or ''}" for d in docs[:30]]
 
-    n_delta = db.scalar("SELECT COUNT(*) FROM state_delta WHERE event_id = ?", (event_id,), 0) or 0
+    # Δstate: solo deltas con procedencia EXTERNA al evento (series como fx/ACLED, o documentos de otros eventos).
+    # Los que deltas_from_event deriva del propio título (source_doc_id ∈ documentos del evento) ya puntúan como
+    # irreversibilidad; contarlos realimentaría la materialidad en cada pasada sin información nueva.
+    n_delta = (
+        db.scalar(
+            """SELECT COUNT(*) FROM state_delta sd WHERE sd.event_id = ?
+               AND NOT EXISTS (SELECT 1 FROM document d WHERE d.id = sd.source_doc_id AND d.event_id = sd.event_id)""",
+            (event_id,),
+            0,
+        )
+        or 0
+    )
     f_delta = min(1.0, n_delta / 2.0)
 
     power_vals = [POWER_BY_COUNTRY.get(c, 0.25) for c in countries] + [
@@ -190,9 +227,11 @@ def compute_materiality(db: Database, event_id: str) -> dict[str, Any]:
 
     f_primary = 1.0 if any((d["tier"] or 4) == 1 for d in docs) else 0.0
 
-    first = parse_iso(ev["first_seen_at"])
-    last = parse_iso(ev["last_update_at"])
-    age_h = ((last - first).total_seconds() / 3600.0) if (first and last) else 0.0
+    # edad del evento desde sus documentos (el más antiguo puede haberse unido después de crear el evento)
+    pubs = [p for p in (parse_iso(d["published_at"]) for d in docs) if p]
+    firsts = [p for p in (parse_iso(ev["first_seen_at"]), *pubs) if p]
+    lasts = [p for p in (parse_iso(ev["last_update_at"]), *pubs) if p]
+    age_h = ((max(lasts) - min(firsts)).total_seconds() / 3600.0) if (firsts and lasts) else 0.0
     f_novelty = 1.0 if age_h < 24 else max(0.0, 1.0 - (age_h - 24) / 144.0)
 
     f_user, user_reasons = user_relevance(countries, texts)
@@ -210,7 +249,7 @@ def compute_materiality(db: Database, event_id: str) -> dict[str, Any]:
     virality = 1.0 if (n_docs >= 15 and f_delta == 0 and f_primary == 0 and f_irrev < 0.4) else 0.0
 
     contrib = {
-        "delta_state": float(w.get("delta_state", 1.4)) * f_delta,
+        "delta_state": float(w.get("delta_state", 1.4)) * f_delta * damp,
         "power": float(w.get("power", 0.9)) * f_power * damp,
         "irreversibility": float(w.get("irreversibility", 1.1)) * f_irrev * damp,
         "breadth": float(w.get("breadth", 0.6)) * f_breadth,

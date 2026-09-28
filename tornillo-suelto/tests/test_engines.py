@@ -131,6 +131,36 @@ def test_diff_detects_material_change():
     assert diff_documents(old, old)["summary"] == "Sin cambios de texto."
 
 
+def test_diff_keeps_short_sentences_and_table_lines():
+    """Las frases cortas con cifras (tablas de tipos de un banco central) no pueden desaparecer del diff."""
+    d = diff_documents(
+        "El tipo de depósito queda en el 2,00%. Sin cambios.",
+        "El tipo de depósito queda en el 2,00%. Sube 25 pb.",
+    )
+    assert d["n_changed"] == 1 and d["summary"] != "Sin cambios de texto."
+    assert any("25 pb" in (m["new"] or "") for m in d["material_changes"])
+
+    d = diff_documents(
+        "Facilidad de depósito: 2,00%. Tipo principal: 2,15%.",
+        "Facilidad de depósito: 1,75%. Tipo principal: 1,90%.",
+    )
+    assert d["n_old"] == d["n_new"] == 2
+    assert [m["new"] for m in d["material_changes"]] == [
+        "Facilidad de depósito: 1,75%.",
+        "Tipo principal: 1,90%.",
+    ]
+
+    d = diff_documents(
+        "Facilidad de depósito: 2,00%\nTipo principal: 2,15%\nFacilidad marginal: 2,40%",
+        "Facilidad de depósito: 1,75%\nTipo principal: 1,90%\nFacilidad marginal: 2,40%",
+    )
+    assert d["n_old"] == 3 and d["n_changed"] == 2
+    assert {m["new"] for m in d["material_changes"]} == {
+        "Facilidad de depósito: 1,75%",
+        "Tipo principal: 1,90%",
+    }
+
+
 # ───────── AFIRMACIONES: cita o descarta ─────────
 
 
@@ -242,8 +272,21 @@ def test_domain_classifier():
 
 def test_irreversibility_scoring_discounts_future_tense():
     assert irreversibility_score(["El presidente dimite tras el escándalo"]) >= 0.8
-    assert irreversibility_score(["El presidente amenaza con dimitir si..."]) < 0.5
+    assert irreversibility_score(["El presidente podría presentar su dimisión"]) < 0.5
+    assert irreversibility_score(["Prime minister could be ousted by his own party"]) < 0.5
     assert irreversibility_score(["Reunión ordinaria del consejo"]) == 0.0
+
+
+def test_irreversibility_ignores_month_may_and_markers_in_other_clauses():
+    assert irreversibility_score(["Prime minister resigns on May 12 after corruption scandal"]) == 0.8
+    assert (
+        irreversibility_score(["Vučić resigns to run for PM. His term would otherwise end in May next year."])
+        == 0.8
+    )
+    assert irreversibility_score(["El presidente dimite. La oposición pide elecciones anticipadas"]) == 0.8
+    assert irreversibility_score(["El presidente dimite y la oposición pide elecciones anticipadas"]) == 0.8
+    assert irreversibility_score(["Dimite el ministro."]) == 0.8  # título corto, no debe descartarse
+    assert irreversibility_score(["Fed May Cut Rates, analysts say"]) < 0.5  # aquí "may" sí es modal
 
 
 # ───────── MATERIALIDAD ─────────
@@ -274,6 +317,39 @@ def test_materiality_single_source_dampened_and_breakdown_present(db):
     }
     assert b_multi["features"]["primary_document"] == 1.0
     assert db.one("SELECT materiality FROM event WHERE id='multi'")["materiality"] == b_multi["score"]
+
+
+def test_materiality_is_idempotent_after_its_own_deltas(db):
+    """Los deltas que deltas_from_event deriva del propio título no realimentan Δstate; uno externo sí."""
+    from atlas_core.db import new_id, now_iso
+    from atlas_core.engines.state import _variable_id, deltas_from_event
+
+    s1 = make_source(db, "pais", tier=2, country="ES")
+    s2 = make_source(db, "mundo", tier=2, country="ES")
+    title = "El presidente dimite tras el escándalo"
+    d1 = make_doc(db, s1, title, "Texto")
+    d2 = make_doc(db, s2, title, "Texto")
+    db.exec(
+        "INSERT INTO event(id, title_neutral, countries, first_seen_at, last_update_at, n_docs, lead_document_id) VALUES ('e1', ?, '[\"ES\"]', ?, ?, 2, ?)",
+        (title, now_iso(), now_iso(), d1),
+    )
+    db.exec("UPDATE document SET event_id = 'e1' WHERE id IN (?, ?)", (d1, d2))
+    first = compute_materiality(db, "e1")
+    assert first["features"]["irreversibility"] >= 0.7 and first["features"]["delta_state"] == 0.0
+    assert (
+        deltas_from_event(db, "e1") == 1
+    )  # POWER.head_of_government, con source_doc_id = documento del evento
+    again = compute_materiality(db, "e1")
+    assert again["score"] == first["score"] and again["features"]["delta_state"] == 0.0
+    assert deltas_from_event(db, "e1") == 0 and compute_materiality(db, "e1")["score"] == first["score"]
+    # un delta con procedencia externa (serie de mercado enlazada al evento) sí mueve la variable de estado
+    vid = _variable_id(db, "ES", "fx_vs_usd", create=True)
+    db.exec(
+        "INSERT INTO state_delta(id, variable_id, event_id, detected_at, magnitude, description) VALUES (?,?,?,?,?,?)",
+        (new_id(), vid, "e1", now_iso(), 2.5, "EURUSD=X: -2.5%"),
+    )
+    ext = compute_materiality(db, "e1")
+    assert ext["features"]["delta_state"] == 0.5 and ext["score"] > first["score"]
 
 
 # ───────── CLUSTERING ─────────
@@ -336,3 +412,232 @@ def test_cluster_joins_similar_docs_and_respects_same_source_rule(db):
     created, updated = idx.flush()
     assert created == 3 and updated == 0
     assert db.scalar("SELECT COUNT(*) FROM event") == 3
+
+
+def _hours_ago(h: float) -> str:
+    from datetime import UTC, datetime, timedelta
+
+    return (datetime.now(UTC) - timedelta(hours=h)).replace(microsecond=0).isoformat()
+
+
+def test_cluster_first_seen_at_is_oldest_document_not_first_processed(db):
+    """El lote se procesa del más reciente al más antiguo: first_seen_at debe retroceder al documento más antiguo
+    y la novedad calcularse sobre la edad real del evento."""
+    from atlas_core.embed import get_embedder
+    from atlas_core.engines.cluster import ClusterIndex
+
+    title = "El Consejo Europeo aprueba el nuevo paquete de sanciones contra Rusia"
+    keys = ["institution:Unión Europea", "country:RU"]
+    vec = get_embedder().embed(title, extra_tokens=keys)
+    idx = ClusterIndex(db)
+    stamps = [_hours_ago(1), _hours_ago(36), _hours_ago(60)]
+    sources = [make_source(db, f"src{i}", country="FR", bloc="eu") for i in range(3)]
+    docs = [make_doc(db, s, title, "Texto", published_at=ts) for s, ts in zip(sources, stamps, strict=True)]
+    eids = {
+        idx.assign(d, vec, keys, ["RU"], ts, "politics", title, [], source_id=s)[0]
+        for d, ts, s in zip(docs, stamps, sources, strict=True)
+    }
+    assert len(eids) == 1
+    eid = eids.pop()
+    idx.flush()
+    ev = db.one("SELECT first_seen_at, last_update_at FROM event WHERE id = ?", (eid,))
+    assert ev["first_seen_at"] == stamps[2] and ev["last_update_at"] == stamps[0]
+    db.exec("UPDATE document SET event_id = ? WHERE id IN (?,?,?)", (eid, *docs))
+    novelty = compute_materiality(db, eid)["features"]["novelty"]
+    assert novelty == round(1 - (59 - 24) / 144, 3)
+    # segunda pasada sobre el índice recargado: un documento aún más antiguo también retrocede la fecha
+    idx2 = ClusterIndex(db)
+    older = _hours_ago(70)
+    d4 = make_doc(db, make_source(db, "src9", country="FR", bloc="eu"), title, "Texto", published_at=older)
+    assert idx2.assign(d4, vec, keys, ["RU"], older, "politics", title, [], source_id="src9")[0] == eid
+    idx2.flush()
+    assert db.one("SELECT first_seen_at FROM event WHERE id = ?", (eid,))["first_seen_at"] == older
+
+
+def _seed_event_pair(db, keys_win: list[str], keys_lose: list[str]):
+    import numpy as np
+
+    from atlas_core.db import dumps, now_iso, vec_to_blob
+    from atlas_core.embed import DIM, get_embedder
+
+    s1, s2 = make_source(db, "c1"), make_source(db, "c2")
+    v = np.zeros(DIM, dtype=np.float32)
+    v[:8] = 1.0
+    now = now_iso()
+    for eid, n, keys, first in (("win", 2, keys_win, now), ("lose", 1, keys_lose, _hours_ago(30))):
+        db.exec(
+            "INSERT INTO event(id,title_neutral,countries,entity_keys,first_seen_at,last_update_at,n_docs,centroid,embedding_model) VALUES (?,?,?,?,?,?,?,?,?)",
+            (eid, eid, dumps(["ES"]), dumps(keys), first, now, n, vec_to_blob(v), get_embedder().name),
+        )
+    d1, d2 = make_doc(db, s1, "A"), make_doc(db, s2, "B")
+    d3 = make_doc(db, s2, "C", published_at=_hours_ago(30))
+    db.exec("UPDATE document SET event_id='win', embedding=? WHERE id IN (?,?)", (vec_to_blob(v), d1, d2))
+    db.exec("UPDATE document SET event_id='lose', embedding=? WHERE id=?", (vec_to_blob(v), d3))
+    db.exec(
+        "INSERT INTO claim(id,event_id,document_id,text_canonical,level,status,extracted_by,created_at) VALUES ('k1','lose',?,'x','fact','unverified','heuristic',?)",
+        (d3, now),
+    )
+    return d1, d2, d3
+
+
+def test_consolidate_merges_duplicate_events_and_keeps_history(db):
+    from atlas_core.db import new_id, now_iso
+    from atlas_core.engines.cluster import consolidate_events
+
+    d1, d2, d3 = _seed_event_pair(db, ["country:ES"], ["country:ES"])
+    db.exec("INSERT INTO event_document(event_id, document_id, similarity) VALUES ('lose', ?, 0.9)", (d3,))
+    db.exec(
+        "INSERT INTO state_variable(id, scope, dimension, key) VALUES ('sv1','ES','POWER','head_of_government')"
+    )
+    db.exec(
+        "INSERT INTO state_delta(id, variable_id, event_id, detected_at, magnitude, description, source_doc_id) VALUES (?,?,?,?,?,?,?)",
+        (new_id(), "sv1", "lose", now_iso(), 1.0, "x", d3),
+    )
+    db.exec(
+        "INSERT INTO business_unit(id, name) VALUES ('b1', 'Negocio')",
+    )
+    db.exec(
+        "INSERT INTO exposure_alert(id, business_id, event_id, channel, explanation, confidence, created_at) VALUES ('ea1','b1','lose','tax','x',0.7,?)",
+        (now_iso(),),
+    )
+    db.exec(
+        "INSERT INTO forecast_question(id, title, resolution_criteria, open_at, close_at, origin_event_id) VALUES ('q1','t','c',?,?,'lose')",
+        (now_iso(), now_iso()),
+    )
+    res = consolidate_events(db, hours=48)
+    assert res["merged"] == 1 and res["winners"] == ["win"]
+    lose = db.one("SELECT status, merged_into FROM event WHERE id='lose'")
+    assert lose["status"] == "merged" and lose["merged_into"] == "win"  # nunca se borra historia
+    assert db.scalar("SELECT COUNT(*) FROM document WHERE event_id='win'") == 3
+    assert db.scalar("SELECT COUNT(*) FROM document WHERE event_id='lose'") == 0
+    assert db.one("SELECT event_id FROM claim WHERE id='k1'")["event_id"] == "win"
+    assert db.one("SELECT event_id FROM state_delta")["event_id"] == "win"
+    assert db.one("SELECT event_id FROM exposure_alert WHERE id='ea1'")["event_id"] == "win"
+    assert db.one("SELECT origin_event_id FROM forecast_question WHERE id='q1'")["origin_event_id"] == "win"
+    assert db.one("SELECT event_id FROM event_document WHERE document_id=?", (d3,))["event_id"] == "win"
+    win = db.one("SELECT n_docs, first_seen_at, last_update_at FROM event WHERE id='win'")
+    assert win["n_docs"] == 3
+    # el ganador adopta la fecha más antigua (del perdedor y de su documento) sin perder la más reciente
+    assert (
+        win["first_seen_at"] == db.one("SELECT published_at FROM document WHERE id=?", (d3,))["published_at"]
+    )
+    assert (
+        win["last_update_at"] == db.one("SELECT published_at FROM document WHERE id=?", (d1,))["published_at"]
+    )
+    assert consolidate_events(db, hours=48)["merged"] == 0  # idempotente
+
+
+def test_consolidate_does_not_merge_events_with_disjoint_entities(db):
+    from atlas_core.engines.cluster import consolidate_events
+
+    _seed_event_pair(db, ["country:ES"], ["country:FR"])
+    assert consolidate_events(db, hours=48)["merged"] == 0
+    assert db.scalar("SELECT COUNT(*) FROM event WHERE status = 'merged'") == 0
+    assert db.one("SELECT event_id FROM claim WHERE id='k1'")["event_id"] == "lose"
+
+
+# ───────── MANDO: exposición ─────────
+
+
+def test_exposure_alert_for_business_unit_explains_channel(seeded):
+    from atlas_core.db import dumps, now_iso
+    from atlas_core.engines.exposure import evaluate_event
+
+    s = make_source(seeded, "boe_x", type="institution", tier=1)
+    title = "Hacienda aprueba la ley del impuesto de sociedades para centros de formación profesional y certificación"
+    d = make_doc(
+        seeded,
+        s,
+        title,
+        "La norma fiscal afecta a la formación y a la educación universitaria; el reglamento entra en vigor.",
+    )
+    seeded.exec(
+        "INSERT INTO event(id,title_neutral,countries,first_seen_at,last_update_at,n_docs,materiality,lead_document_id) VALUES ('ex1',?,?,?,?,1,55,?)",
+        (title, dumps(["ES"]), now_iso(), now_iso(), d),
+    )
+    alerts = evaluate_event(seeded, "ex1")
+    assert {a["channel"] for a in alerts} == {"regulatory", "tax"}
+    assert all("Fit Generation" in a["business_name"] and 0.6 <= a["confidence"] <= 0.95 for a in alerts)
+    assert all("canal" in a["explanation"] and "Jurisdicción coincide" in a["explanation"] for a in alerts)
+    reg = next(a for a in alerts if a["channel"] == "regulatory")
+    assert "ley" in reg["explanation"] and "formación profesional" in reg["explanation"]
+    assert seeded.scalar("SELECT COUNT(*) FROM exposure_alert WHERE event_id='ex1'") == 2
+    # upsert: reevaluar no duplica
+    assert (
+        len(evaluate_event(seeded, "ex1")) == 2 and seeded.scalar("SELECT COUNT(*) FROM exposure_alert") == 2
+    )
+    seeded.exec("UPDATE event SET materiality = 10 WHERE id='ex1'")
+    assert evaluate_event(seeded, "ex1") == []  # MIN_MATERIALITY
+
+
+def test_exposure_ignores_substring_matches_inside_words(seeded):
+    """«ema» dentro de «alemán» y «ley» dentro de «leyenda» no son términos del sector ni del canal (caso real:
+    documental de Schumacher → alerta regulatoria de un negocio biotech)."""
+    from atlas_core.db import dumps, now_iso
+    from atlas_core.engines.exposure import evaluate_event
+
+    s = make_source(seeded, "prensa_x", country="DE", bloc="eu")
+    title = "Llega a Netflix un nuevo documental de Schumacher en el que actualiza su estado de salud"
+    d = make_doc(
+        seeded,
+        s,
+        title,
+        "El piloto alemán, leyenda de la Fórmula 1, aparece por primera vez desde el accidente. Sistema y problema, importante reporte.",
+    )
+    seeded.exec(
+        "INSERT INTO event(id,title_neutral,countries,first_seen_at,last_update_at,n_docs,materiality,lead_document_id) VALUES ('ex2',?,?,?,?,1,38.8,?)",
+        (title, dumps(["DE"]), now_iso(), now_iso(), d),
+    )
+    assert evaluate_event(seeded, "ex2") == []
+    assert seeded.scalar("SELECT COUNT(*) FROM exposure_alert") == 0
+
+
+# ───────── ESTADO: deltas de mercado ─────────
+
+
+def _fx_history(vals: list[float]) -> str:
+    import json
+
+    return json.dumps([{"t": f"2026-09-{20 + i:02d}T00:00:00+00:00", "v": v} for i, v in enumerate(vals)])
+
+
+def test_fx_deltas_direction_threshold_and_dedup(seeded):
+    from atlas_core.db import now_iso
+    from atlas_core.engines.state import deltas_from_markets
+
+    observed = "2026-09-26T00:00:00+00:00"
+    for sym, vals in (
+        ("USDTRY=X", [30, 30.2, 30.5, 30.7, 30.8, 30.9, 30.93]),  # +2.4 % → lira se deprecia
+        ("EURUSD=X", [1.10, 1.09, 1.08, 1.07, 1.07, 1.065, 1.066]),  # −2.2 % → euro se deprecia
+        ("USDBRL=X", [5.0, 5.0, 5.01, 5.0, 5.02, 5.01, 5.02]),  # +0.4 % → sin delta
+    ):
+        seeded.exec(
+            "INSERT INTO market_quote(symbol,label,group_name,price,observed_at,fetched_at,source,history) VALUES (?,?,?,?,?,?,?,?)",
+            (sym, sym, "fx", vals[-1], observed, now_iso(), "test", _fx_history(vals)),
+        )
+    assert deltas_from_markets(seeded) == 2
+    ds = [r["description"] for r in seeded.all("SELECT description FROM state_delta ORDER BY description")]
+    assert ds[0].startswith("EURUSD=X: -2.2%") and "se deprecia" in ds[0]
+    assert ds[1].startswith("USDTRY=X: +2.4%") and "se deprecia" in ds[1]
+    assert deltas_from_markets(seeded) == 0  # dedup 6 días
+    assert seeded.scalar("SELECT COUNT(*) FROM state_observation") == 3
+
+
+def test_fx_every_mapped_symbol_records_observation(seeded):
+    from atlas_core.db import now_iso
+    from atlas_core.engines.state import FX_SYMBOL_TO_COUNTRY, deltas_from_markets
+
+    flat = _fx_history([100.0] * 7)
+    for sym in FX_SYMBOL_TO_COUNTRY:
+        seeded.exec(
+            "INSERT INTO market_quote(symbol,label,group_name,price,fetched_at,source,history) VALUES (?,?,?,?,?,?,?)",
+            (sym, sym, "fx", 100.0, now_iso(), "test", flat),
+        )
+    assert deltas_from_markets(seeded) == 0  # variación 0 %: sin deltas
+    scopes = {
+        r["scope"]
+        for r in seeded.all(
+            "SELECT sv.scope FROM state_observation o JOIN state_variable sv ON sv.id = o.variable_id WHERE sv.key = 'fx_vs_usd'"
+        )
+    }
+    assert scopes == set(FX_SYMBOL_TO_COUNTRY.values())  # incluye JP, que no es de nivel A

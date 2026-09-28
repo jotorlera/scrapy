@@ -8,7 +8,7 @@ import difflib
 import re
 from typing import Any
 
-from ..util import split_sentences
+from ..util import _ABBR, _SENT_RE
 
 _NUM = re.compile(r"\d")
 _MODAL = re.compile(
@@ -21,9 +21,30 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s.strip().lower())
 
 
+def _sentences(line: str) -> list[str]:
+    """Frases de una línea SIN longitud mínima (util.split_sentences descarta fragmentos < 25 caracteres, y
+    «Tipo principal: 2,15%.» o «Sube 25 pb.» son justo lo que un diff de comunicados no puede perder)."""
+    t = line
+    for ab in _ABBR:
+        t = t.replace(ab, ab.replace(".", "․"))
+    return [p.replace("․", ".").strip() for p in _SENT_RE.split(t) if p.strip()]
+
+
+def _segments(text: str) -> list[str]:
+    """Unidades del diff: cada línea no vacía (clean_html conserva <p>, <br>, <li>, <tr> como saltos de línea),
+    subdividida en frases sin mínimo de longitud."""
+    out: list[str] = []
+    for line in (text or "").split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        out.extend(_sentences(line) or [line])
+    return out or [text or ""]
+
+
 def diff_documents(old_text: str, new_text: str) -> dict[str, Any]:
-    a = split_sentences(old_text or "") or [old_text or ""]
-    b = split_sentences(new_text or "") or [new_text or ""]
+    a = _segments(old_text)
+    b = _segments(new_text)
     sm = difflib.SequenceMatcher(a=[_norm(x) for x in a], b=[_norm(x) for x in b], autojunk=False)
     ops: list[dict[str, Any]] = []
     material: list[dict[str, Any]] = []

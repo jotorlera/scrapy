@@ -1,10 +1,16 @@
 """MANDO: exposición de los negocios del usuario a eventos, por canal (docs/spec/02 M14). Reglas deterministas:
 jurisdicción (país del evento ∈ jurisdicciones o UE) × sector/palabras clave × canal por vocabulario.
 Cada alerta explica su canal y su confianza. Nada del perfil sale del proceso.
+
+Los términos se comparan como palabras completas (límites de palabra tolerantes, como en el gazetteer), con plural
+opcional en cada palabra; un término acabado en `*` es una raíz («biotec*» casa con «biotecnología»). Así «ema» no
+aparece dentro de «alemán» ni «ley» dentro de «leyenda».
 """
 
 from __future__ import annotations
 
+import re
+from functools import lru_cache
 from typing import Any
 
 from ..db import Database, loads, new_id, now_iso
@@ -54,13 +60,13 @@ CHANNEL_VOCAB: dict[str, tuple[str, ...]] = {
         "rgpd",
         "gdpr",
         "ehds",
-        "autoriza",
+        "autoriza*",
         "approval",
-        "ema",
+        "agencia europea de medicamentos",
+        "european medicines agency",
         "fda",
         "licencia",
-        "prohib",
-        "ban",
+        "prohib*",
         "etiquetado",
         "labelling",
         "certificación",
@@ -79,7 +85,7 @@ CHANNEL_VOCAB: dict[str, tuple[str, ...]] = {
         "pilar 2",
         "pillar two",
         "hacienda",
-        "tributari",
+        "tributari*",
         "aranceles",
         "tariff",
     ),
@@ -93,7 +99,8 @@ CHANNEL_VOCAB: dict[str, tuple[str, ...]] = {
         "currency",
         "bce",
         "ecb",
-        "fed",
+        "reserva federal",
+        "federal reserve",
         "tipos de interés",
         "interest rate",
     ),
@@ -162,7 +169,7 @@ CHANNEL_VOCAB: dict[str, tuple[str, ...]] = {
         "acquisition",
         "ronda",
         "funding round",
-        "lanza",
+        "lanza*",
         "launches",
         "patente",
         "patent",
@@ -173,17 +180,18 @@ CHANNEL_VOCAB: dict[str, tuple[str, ...]] = {
 
 SECTOR_VOCAB: dict[str, tuple[str, ...]] = {
     "biotecnología": (
-        "biotec",
+        "biotec*",
         "biotech",
-        "farmac",
-        "pharma",
+        "farmac*",
+        "pharma*",
         "medicamento",
         "drug",
         "terapia",
         "therapy",
         "ensayo clínico",
         "clinical trial",
-        "ema",
+        "agencia europea de medicamentos",
+        "european medicines agency",
         "fda",
         "genética",
         "genomic",
@@ -193,12 +201,13 @@ SECTOR_VOCAB: dict[str, tuple[str, ...]] = {
         "health",
         "sanidad",
         "hospital",
-        "médic",
+        "médic*",
         "medical",
         "paciente",
         "patient",
         "oms",
-        "who",
+        "organización mundial de la salud",
+        "world health organization",
         "envejecimiento",
         "ageing",
         "aging",
@@ -214,7 +223,7 @@ SECTOR_VOCAB: dict[str, tuple[str, ...]] = {
         "university",
         "certificación",
         "certification",
-        "fp ",
+        "fp",
         "vocational",
     ),
     "fitness": (
@@ -287,8 +296,28 @@ SECTOR_VOCAB: dict[str, tuple[str, ...]] = {
 }
 
 
-def _match_terms(blob: str, vocab: tuple[str, ...]) -> list[str]:
-    return [t for t in vocab if normalize_text(t) in blob]
+@lru_cache(maxsize=4096)
+def _term_rx(term: str) -> re.Pattern | None:
+    """Regex de palabra completa para un término del vocabulario o del perfil (normalizado, sin acentos).
+    Cada palabra admite plural (-s/-es); `*` final marca raíz sin límite derecho. Igual criterio que gazetteer."""
+    stem = term.endswith("*")
+    words = normalize_text(term.rstrip("*")).split()
+    if not words:
+        return None
+    body = r"\s+".join(re.escape(w) + r"(?:e?s)?" for w in words)
+    if stem:
+        body = r"\s+".join(re.escape(w) for w in words)
+    return re.compile(r"(?<![\w])" + body + ("" if stem else r"(?![\w])"))
+
+
+def _term_hits(blob: str, terms: list[str] | tuple[str, ...]) -> list[str]:
+    """Términos (tal como se muestran, sin `*`) presentes en `blob` como palabras completas."""
+    out: list[str] = []
+    for t in terms:
+        rx = _term_rx(t)
+        if rx is not None and rx.search(blob):
+            out.append(t.rstrip("*"))
+    return out
 
 
 MIN_MATERIALITY = 30.0
@@ -321,19 +350,20 @@ def evaluate_event(db: Database, event_id: str) -> list[dict[str, Any]]:
         if not in_juris:
             continue
         sectors = loads(b["sectors"], [])
-        keywords = [normalize_text(k) for k in loads(b["keywords"], []) if k]
         sector_hits: list[str] = []
         for s in sectors:
-            sector_hits += _match_terms(blob, SECTOR_VOCAB.get(s, (s,)))
+            sector_hits += _term_hits(blob, SECTOR_VOCAB.get(s, (s,)))
         sector_hits = sorted(set(sector_hits))
-        kw_hits = [k for k in keywords if k in blob]
-        reg_hits = [r for r in loads(b["regulations"], []) if normalize_text(r.split("(")[0].strip()) in blob]
+        kw_hits = _term_hits(blob, [k for k in loads(b["keywords"], []) if k])
+        reg_hits = [r for r in loads(b["regulations"], []) if _term_hits(blob, [r.split("(")[0].strip()])]
         # pertinencia sectorial: ≥ 2 términos distintos del sector, o palabra clave propia, o regulación nombrada
         if not (len(sector_hits) >= 2 or kw_hits or reg_hits):
             continue
         for channel, vocab in CHANNEL_VOCAB.items():
-            ch_hits = sorted(set(_match_terms(blob, vocab)))
-            if len(ch_hits) < 2 and not (reg_hits and channel == "regulatory"):
+            ch_hits = sorted(set(_term_hits(blob, vocab)))
+            # ≥ 2 términos del canal; con regulación nombrada basta 1 en el canal regulatorio (nunca 0: la
+            # explicación debe poder citar el término)
+            if len(ch_hits) < 2 and not (reg_hits and channel == "regulatory" and ch_hits):
                 continue
             conf = (
                 0.2 * min(3, len(sector_hits))
@@ -350,11 +380,7 @@ def evaluate_event(db: Database, event_id: str) -> list[dict[str, Any]]:
                 f"del canal ({', '.join(ch_hits[:3])})"
                 + (f", palabras clave ({', '.join(kw_hits[:2])})" if kw_hits else "")
                 + (f", regulación ({', '.join(reg_hits[:2])})" if reg_hits else "")
-                + (
-                    ". Jurisdicción coincide."
-                    if in_juris
-                    else ". Jurisdicción no coincide: exposición indirecta."
-                )
+                + ". Jurisdicción coincide."  # los negocios fuera de jurisdicción se descartan arriba
             )
             alerts.append(
                 {
