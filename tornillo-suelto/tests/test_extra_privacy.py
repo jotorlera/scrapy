@@ -73,3 +73,31 @@ def test_suite_uses_the_fixture_profile_not_the_personal_one():
     prof = profile_config()
     assert prof["usuario"]["nombre"] == "Usuaria de Pruebas"
     assert len(prof["negocios"]) == 4
+
+
+def test_every_source_file_is_tracked_by_git():
+    """El .gitignore raíz del repositorio anfitrión (p. ej. `coverage.*`) no debe tragarse ningún módulo.
+
+    Un clon limpio de la rama tiene que arrancar: cada .py del paquete, cada test y cada .ts/.tsx/.css del
+    frontend debe estar versionado o, como mínimo, no ignorado.
+    """
+    _require_git_checkout()
+    patterns = [
+        "services/core/atlas_core/**/*.py",
+        "tests/**/*.py",
+        "apps/web/src/**/*",
+        "config/*.yaml",
+        "prompts/**/*",
+    ]
+    files = [
+        str(p.relative_to(ROOT))
+        for pat in patterns
+        for p in ROOT.glob(pat)
+        if p.is_file() and "__pycache__" not in p.parts and p.name != "perfil.yaml"
+    ]
+    assert files
+    r = _git("check-ignore", *files)
+    ignored = [line for line in r.stdout.splitlines() if line.strip()]
+    assert not ignored, (
+        f"archivos del proyecto ignorados por git (añade una excepción `!ruta` en .gitignore): {ignored}"
+    )

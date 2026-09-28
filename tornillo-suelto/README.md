@@ -31,7 +31,19 @@ socrático), PRONÓSTICOS y SIMULADOR (superpronosticador) y BRIEF (editor jefe)
 todavía (detalle en `docs/PLANTEAMIENTO.md` §3). Cada llamada queda registrada con su coste. Y sí: **Tuerca**, la
 gata, pasea por la pantalla.
 
-## Arrancar en cuatro comandos
+## Arrancar en un comando
+
+```bash
+git clone -b claude/cloud-tool-cat-feature-dtnbrj https://github.com/jotorlera/scrapy.git
+cd scrapy/tornillo-suelto && ./arrancar.sh
+```
+
+`arrancar.sh` (macOS/Linux) comprueba Python ≥ 3.11 y Node ≥ 20, instala todo en `.venv` y `apps/web/node_modules`,
+compila la web, crea `config/perfil.yaml` desde la plantilla, siembra, hace una primera ingesta de 40 fuentes y
+abre <http://127.0.0.1:8765>. Con `--rapido` salta la ingesta inicial; con `--solo-instalar` no arranca el servidor.
+En Windows, usa WSL o los cuatro comandos de abajo desde PowerShell.
+
+## O en cuatro comandos
 
 ```bash
 make install                                    # crea .venv, instala backend (uv) y frontend (npm)
