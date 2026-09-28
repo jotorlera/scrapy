@@ -22,6 +22,10 @@ Actualizado: 2026-09-28 (sesión de construcción inicial, en la nube).
   índice de silencio → materialidad con desglose → deltas de estado → exposición (MANDO).
 - Ingesta real medida: 120 fuentes → 3.812 documentos en 110 s; eventos multi-fuente coherentes (dimisión de
   Vučić en 8 medios, referéndum suizo de neutralidad, detenciones en RAF Fairford, tiroteos en Sudáfrica…).
+- Planificador verificado con la API levantada: mercados cada 15 min, ingesta de las 199 fuentes en dos pasadas
+  (6.252 documentos, 106 eventos multi-fuente, 15.722 afirmaciones con cita), ETag/If-Modified-Since operativo
+  (32 fuentes «no modificadas» en la segunda pasada) y la API respondiendo en < 0,3 s durante el procesado (el
+  trabajo pesado corre fuera del bucle de eventos).
 - Cinta de mercados (Yahoo chart API) y mercados de predicción (Polymarket, Manifold) con hora y fuente del dato.
 
 ### Fase 2 — Rigor (parcial)
