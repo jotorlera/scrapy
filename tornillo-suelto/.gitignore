@@ -1,0 +1,22 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/feeds_verified.yaml
+data/feeds_alt.yaml
+data/cache/
+.env
+apps/web/node_modules/
+apps/web/dist/
+references/
+*.egg-info/
+data/*.lock
+# Perfil personal (nombre, estudios, negocios): nunca versionado. Plantilla en config/perfil.example.yaml
+config/perfil.yaml
+# El .gitignore raíz de scrapy tiene `coverage.*` (informes de cobertura) y se tragaba este motor.
+!services/core/atlas_core/engines/coverage.py

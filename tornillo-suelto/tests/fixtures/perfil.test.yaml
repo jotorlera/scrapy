@@ -1,0 +1,64 @@
+# Perfil FICTICIO para la suite de tests (tests/conftest.py lo inyecta en profile_config()).
+# La suite nunca debe depender de config/perfil.yaml (personal, fuera de git). Cuatro negocios: test_mando_and_diet.
+# Misma estructura que config/perfil.example.yaml; los negocios cubren los sectores del vocabulario de
+# engines/exposure.py (biotecnología/salud, formación, salud digital, consumo/textil).
+
+usuario:
+  nombre: "Usuaria de Pruebas"
+  firma_trabajos: "Usuaria de Pruebas"
+  idiomas: [es, en]
+  zona_horaria: "UTC"
+  hora_brief: "07:00"
+  email_brief: null
+
+estudios:
+  grado: "Grado de pruebas"
+  universidad: "Universidad de pruebas"
+  asignaturas_en_curso:
+    - nombre: "Asignatura de pruebas"
+      bibliografia:
+        - "Autora — Obra de pruebas"
+  intereses_teoricos_semilla:
+    - "Interés de pruebas"
+  conceptos_a_etiquetar:
+    filosofia: [libertad negativa, contrato social]
+    ciencia_politica: [separación de poderes, populismo]
+    economia: [externalidades, incentivos]
+    rrii: [dilema de seguridad, disuasión]
+
+investigacion:
+  areas: [área de pruebas]
+  nicho_estrategico: "Nicho de pruebas"
+  vigilar_huecos_de_investigacion: true
+
+negocios:
+  - nombre: "Biotec de pruebas"
+    sectores: [biotecnología, salud]
+    jurisdicciones: [PT, EU]
+    regulacion_relevante: [datos de salud (RGPD/EHDS), productos sanitarios, ensayos clínicos]
+    palabras_clave: []
+  - nombre: "Formación de pruebas"
+    sectores: [formación, fitness, investigación aplicada]
+    jurisdicciones: [ES, EU]
+    regulacion_relevante: [formación profesional, fiscalidad de la formación]
+    palabras_clave: []
+  - nombre: "App de pruebas"
+    sectores: [salud digital]
+    jurisdicciones: [EU]
+    regulacion_relevante: [AI Act, productos sanitarios software (MDR), RGPD, EHDS]
+    palabras_clave: []
+  - nombre: "Textil de pruebas"
+    sectores: [consumo, textil]
+    jurisdicciones: []
+    regulacion_relevante: []
+    palabras_clave: []
+
+negocios_contexto:
+  divisas_relevantes: [EUR, USD]
+  colaboraciones: []
+
+preferencias_atlas:
+  paises_nivel_A_extra: []
+  tope_coste_diario_usd: 10
+  modo_inicio: ANALISTA
+  tema: claro

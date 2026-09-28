@@ -1,0 +1,356 @@
+# ATLAS — Catálogo semilla de fuentes
+# Estado: seed_unverified. El agente `curador-fuentes` DEBE verificar feeds, acceso, robots.txt,
+# exclusiones anti-IA y contrastar la clasificación con ≥2 fuentes de rating antes de marcar `verified`.
+# Las etiquetas ideológicas son orientativas y RELATIVAS AL PAÍS (label_local). No son juicios de valor.
+# Campos abreviados: t=type, tier, c=country, l=languages, bloc=region_bloc, st=state_relation, lab=ideology_label_local
+# Valores de lab: left | center_left | center | center_right | right | heterodox | institutional | unknown
+# Los feeds se autodescubren; aquí solo va el dominio.
+
+defaults: {review_status: seed_unverified, active: true}
+
+agencias_globales:
+  - {slug: reuters, name: Reuters, domain: reuters.com, t: wire, tier: 2, c: GB, l: [en, es, fr, de, ar, zh, ja], bloc: global, st: independent, lab: center}
+  - {slug: ap, name: Associated Press, domain: apnews.com, t: wire, tier: 2, c: US, l: [en, es], bloc: global, st: independent, lab: center}
+  - {slug: afp, name: Agence France-Presse, domain: afp.com, t: wire, tier: 2, c: FR, l: [fr, en, es, ar, de, pt], bloc: global, st: public_service_independent, lab: center}
+  - {slug: efe, name: Agencia EFE, domain: efe.com, t: wire, tier: 2, c: ES, l: [es, en, pt, ar], bloc: es, st: public_service_independent, lab: center}
+  - {slug: dpa, name: dpa, domain: dpa.com, t: wire, tier: 2, c: DE, l: [de, en, es, ar], bloc: eu, st: independent, lab: center}
+  - {slug: ansa, name: ANSA, domain: ansa.it, t: wire, tier: 2, c: IT, l: [it, en], bloc: eu, st: independent, lab: center}
+  - {slug: europapress, name: Europa Press, domain: europapress.es, t: wire, tier: 2, c: ES, l: [es], bloc: es, st: independent, lab: center}
+  - {slug: bloomberg, name: Bloomberg, domain: bloomberg.com, t: newspaper, tier: 2, c: US, l: [en], bloc: global, st: independent, lab: center, paywall: hard}
+  - {slug: kyodo, name: Kyodo News, domain: english.kyodonews.net, t: wire, tier: 2, c: JP, l: [en, ja], bloc: japan_korea, st: independent, lab: center}
+  - {slug: yonhap, name: Yonhap, domain: en.yna.co.kr, t: wire, tier: 2, c: KR, l: [en, ko], bloc: japan_korea, st: public_service_independent, lab: center}
+  - {slug: xinhua, name: Xinhua, domain: english.news.cn, t: state_media, tier: 3, c: CN, l: [en, zh, es, fr, ar, ru], bloc: china, st: state_controlled, lab: institutional}
+  - {slug: tass, name: TASS, domain: tass.com, t: state_media, tier: 3, c: RU, l: [en, ru], bloc: russia, st: state_controlled, lab: institutional}
+  - {slug: anadolu, name: Anadolu Ajansı, domain: aa.com.tr, t: state_media, tier: 3, c: TR, l: [tr, en, ar, es], bloc: turkey, st: state_aligned, lab: institutional}
+  - {slug: pti, name: Press Trust of India, domain: ptinews.com, t: wire, tier: 2, c: IN, l: [en], bloc: india, st: independent, lab: center}
+  - {slug: ipsnews, name: Inter Press Service, domain: ipsnews.net, t: wire, tier: 3, c: IT, l: [en, es], bloc: global, st: independent, lab: center_left}
+
+espana:
+  - {slug: elpais, name: El País, domain: elpais.com, t: newspaper, tier: 2, c: ES, l: [es, en, pt], bloc: es, st: independent, lab: center_left, paywall: metered}
+  - {slug: elmundo, name: El Mundo, domain: elmundo.es, t: newspaper, tier: 2, c: ES, l: [es], bloc: es, st: independent, lab: center_right, paywall: metered}
+  - {slug: abc, name: ABC, domain: abc.es, t: newspaper, tier: 2, c: ES, l: [es], bloc: es, st: independent, lab: right, paywall: metered}
+  - {slug: lavanguardia, name: La Vanguardia, domain: lavanguardia.com, t: newspaper, tier: 2, c: ES, l: [es, ca], bloc: es, st: independent, lab: center, paywall: metered}
+  - {slug: elconfidencial, name: El Confidencial, domain: elconfidencial.com, t: digital_native, tier: 2, c: ES, l: [es], bloc: es, st: independent, lab: center_right, paywall: metered}
+  - {slug: eldiario, name: elDiario.es, domain: eldiario.es, t: digital_native, tier: 2, c: ES, l: [es], bloc: es, st: independent, lab: left}
+  - {slug: publico, name: Público, domain: publico.es, t: digital_native, tier: 3, c: ES, l: [es], bloc: es, st: independent, lab: left}
+  - {slug: larazon, name: La Razón, domain: larazon.es, t: newspaper, tier: 3, c: ES, l: [es], bloc: es, st: independent, lab: right}
+  - {slug: elespanol, name: El Español, domain: elespanol.com, t: digital_native, tier: 3, c: ES, l: [es], bloc: es, st: independent, lab: center_right}
+  - {slug: theobjective, name: The Objective, domain: theobjective.com, t: digital_native, tier: 3, c: ES, l: [es], bloc: es, st: independent, lab: right}
+  - {slug: infolibre, name: infoLibre, domain: infolibre.es, t: digital_native, tier: 3, c: ES, l: [es], bloc: es, st: independent, lab: left}
+  - {slug: expansion, name: Expansión, domain: expansion.com, t: newspaper, tier: 2, c: ES, l: [es], bloc: es, st: independent, lab: center_right, paywall: metered}
+  - {slug: cincodias, name: Cinco Días, domain: cincodias.elpais.com, t: newspaper, tier: 2, c: ES, l: [es], bloc: es, st: independent, lab: center}
+  - {slug: rtve, name: RTVE Noticias, domain: rtve.es, t: broadcaster, tier: 2, c: ES, l: [es], bloc: es, st: public_service_independent, lab: center}
+  - {slug: cadenaser, name: Cadena SER, domain: cadenaser.com, t: broadcaster, tier: 2, c: ES, l: [es], bloc: es, st: independent, lab: center_left}
+  - {slug: cope, name: COPE, domain: cope.es, t: broadcaster, tier: 3, c: ES, l: [es], bloc: es, st: independent, lab: right}
+  - {slug: elperiodico, name: El Periódico, domain: elperiodico.com, t: newspaper, tier: 2, c: ES, l: [es, ca], bloc: es, st: independent, lab: center_left}
+  - {slug: vozpopuli, name: Vozpópuli, domain: vozpopuli.com, t: digital_native, tier: 3, c: ES, l: [es], bloc: es, st: independent, lab: right}
+  - {slug: ctxt, name: CTXT, domain: ctxt.es, t: magazine, tier: 3, c: ES, l: [es], bloc: es, st: independent, lab: left}
+  - {slug: agendapublica, name: Agenda Pública, domain: agendapublica.es, t: magazine, tier: 3, c: ES, l: [es], bloc: es, st: independent, lab: center}
+
+francia:
+  - {slug: lemonde, name: Le Monde, domain: lemonde.fr, t: newspaper, tier: 2, c: FR, l: [fr, en], bloc: eu, st: independent, lab: center_left, paywall: metered}
+  - {slug: lefigaro, name: Le Figaro, domain: lefigaro.fr, t: newspaper, tier: 2, c: FR, l: [fr], bloc: eu, st: independent, lab: center_right, paywall: metered}
+  - {slug: liberation, name: Libération, domain: liberation.fr, t: newspaper, tier: 2, c: FR, l: [fr], bloc: eu, st: independent, lab: left, paywall: metered}
+  - {slug: lesechos, name: Les Échos, domain: lesechos.fr, t: newspaper, tier: 2, c: FR, l: [fr], bloc: eu, st: independent, lab: center_right, paywall: metered}
+  - {slug: france24, name: France 24, domain: france24.com, t: broadcaster, tier: 2, c: FR, l: [fr, en, es, ar], bloc: eu, st: public_service_independent, lab: center}
+  - {slug: mediapart, name: Mediapart, domain: mediapart.fr, t: digital_native, tier: 3, c: FR, l: [fr], bloc: eu, st: independent, lab: left, paywall: hard}
+  - {slug: valeursactuelles, name: Valeurs actuelles, domain: valeursactuelles.com, t: magazine, tier: 3, c: FR, l: [fr], bloc: eu, st: independent, lab: right}
+
+alemania:
+  - {slug: faz, name: Frankfurter Allgemeine, domain: faz.net, t: newspaper, tier: 2, c: DE, l: [de], bloc: eu, st: independent, lab: center_right, paywall: metered}
+  - {slug: sueddeutsche, name: Süddeutsche Zeitung, domain: sueddeutsche.de, t: newspaper, tier: 2, c: DE, l: [de], bloc: eu, st: independent, lab: center_left, paywall: metered}
+  - {slug: spiegel, name: Der Spiegel, domain: spiegel.de, t: magazine, tier: 2, c: DE, l: [de, en], bloc: eu, st: independent, lab: center_left, paywall: metered}
+  - {slug: welt, name: Die Welt, domain: welt.de, t: newspaper, tier: 2, c: DE, l: [de], bloc: eu, st: independent, lab: center_right, paywall: metered}
+  - {slug: handelsblatt, name: Handelsblatt, domain: handelsblatt.com, t: newspaper, tier: 2, c: DE, l: [de], bloc: eu, st: independent, lab: center, paywall: hard}
+  - {slug: dw, name: Deutsche Welle, domain: dw.com, t: broadcaster, tier: 2, c: DE, l: [de, en, es, ar, ru, tr, zh], bloc: eu, st: public_service_independent, lab: center}
+  - {slug: taz, name: taz, domain: taz.de, t: newspaper, tier: 3, c: DE, l: [de], bloc: eu, st: independent, lab: left}
+  - {slug: tagesschau, name: Tagesschau (ARD), domain: tagesschau.de, t: broadcaster, tier: 2, c: DE, l: [de], bloc: eu, st: public_service_independent, lab: center}
+
+italia_portugal_otros_ue:
+  - {slug: corriere, name: Corriere della Sera, domain: corriere.it, t: newspaper, tier: 2, c: IT, l: [it], bloc: eu, st: independent, lab: center, paywall: metered}
+  - {slug: repubblica, name: la Repubblica, domain: repubblica.it, t: newspaper, tier: 2, c: IT, l: [it], bloc: eu, st: independent, lab: center_left, paywall: metered}
+  - {slug: ilsole24ore, name: Il Sole 24 Ore, domain: ilsole24ore.com, t: newspaper, tier: 2, c: IT, l: [it], bloc: eu, st: independent, lab: center, paywall: metered}
+  - {slug: ilgiornale, name: il Giornale, domain: ilgiornale.it, t: newspaper, tier: 3, c: IT, l: [it], bloc: eu, st: independent, lab: right}
+  - {slug: publico_pt, name: Público (PT), domain: publico.pt, t: newspaper, tier: 2, c: PT, l: [pt], bloc: eu, st: independent, lab: center_left}
+  - {slug: observador, name: Observador, domain: observador.pt, t: digital_native, tier: 3, c: PT, l: [pt], bloc: eu, st: independent, lab: center_right}
+  - {slug: nrc, name: NRC, domain: nrc.nl, t: newspaper, tier: 2, c: NL, l: [nl], bloc: eu, st: independent, lab: center}
+  - {slug: gazetawyborcza, name: Gazeta Wyborcza, domain: wyborcza.pl, t: newspaper, tier: 2, c: PL, l: [pl], bloc: eu, st: independent, lab: center_left, paywall: metered}
+  - {slug: rzeczpospolita, name: Rzeczpospolita, domain: rp.pl, t: newspaper, tier: 2, c: PL, l: [pl], bloc: eu, st: independent, lab: center_right, paywall: metered}
+  - {slug: kathimerini, name: Kathimerini, domain: ekathimerini.com, t: newspaper, tier: 2, c: GR, l: [en, el], bloc: eu, st: independent, lab: center_right}
+  - {slug: politico_eu, name: POLITICO Europe, domain: politico.eu, t: digital_native, tier: 2, c: BE, l: [en], bloc: eu, st: independent, lab: center}
+  - {slug: euractiv, name: Euractiv, domain: euractiv.com, t: digital_native, tier: 2, c: BE, l: [en, fr, de], bloc: eu, st: independent, lab: center}
+  - {slug: euobserver, name: EUobserver, domain: euobserver.com, t: digital_native, tier: 2, c: BE, l: [en], bloc: eu, st: independent, lab: center_left}
+  - {slug: euronews, name: Euronews, domain: euronews.com, t: broadcaster, tier: 2, c: FR, l: [en, es, fr, de, it, pt], bloc: eu, st: independent, lab: center}
+  - {slug: monacomatin, name: Monaco-Matin, domain: monacomatin.mc, t: newspaper, tier: 3, c: MC, l: [fr], bloc: eu, st: independent, lab: center}
+  - {slug: altaveu, name: Altaveu (Andorra), domain: altaveu.com, t: digital_native, tier: 3, c: AD, l: [ca], bloc: eu, st: independent, lab: unknown}
+
+reino_unido_irlanda:
+  - {slug: ft, name: Financial Times, domain: ft.com, t: newspaper, tier: 2, c: GB, l: [en], bloc: anglo, st: independent, lab: center, paywall: hard}
+  - {slug: economist, name: The Economist, domain: economist.com, t: magazine, tier: 2, c: GB, l: [en], bloc: anglo, st: independent, lab: center, paywall: hard}
+  - {slug: guardian, name: The Guardian, domain: theguardian.com, t: newspaper, tier: 2, c: GB, l: [en], bloc: anglo, st: independent, lab: center_left}
+  - {slug: times_uk, name: The Times, domain: thetimes.com, t: newspaper, tier: 2, c: GB, l: [en], bloc: anglo, st: independent, lab: center_right, paywall: hard}
+  - {slug: telegraph, name: The Telegraph, domain: telegraph.co.uk, t: newspaper, tier: 2, c: GB, l: [en], bloc: anglo, st: independent, lab: right, paywall: metered}
+  - {slug: bbc, name: BBC News, domain: bbc.com, t: broadcaster, tier: 2, c: GB, l: [en, es, ar, ru, tr, zh, fa, hi], bloc: anglo, st: public_service_independent, lab: center}
+  - {slug: spectator, name: The Spectator, domain: spectator.co.uk, t: magazine, tier: 3, c: GB, l: [en], bloc: anglo, st: independent, lab: right}
+  - {slug: newstatesman, name: New Statesman, domain: newstatesman.com, t: magazine, tier: 3, c: GB, l: [en], bloc: anglo, st: independent, lab: left}
+  - {slug: irishtimes, name: The Irish Times, domain: irishtimes.com, t: newspaper, tier: 2, c: IE, l: [en], bloc: anglo, st: independent, lab: center}
+
+estados_unidos_canada:
+  - {slug: nyt, name: The New York Times, domain: nytimes.com, t: newspaper, tier: 2, c: US, l: [en], bloc: anglo, st: independent, lab: center_left, paywall: metered}
+  - {slug: wsj, name: The Wall Street Journal, domain: wsj.com, t: newspaper, tier: 2, c: US, l: [en], bloc: anglo, st: independent, lab: center_right, paywall: hard}
+  - {slug: wapo, name: The Washington Post, domain: washingtonpost.com, t: newspaper, tier: 2, c: US, l: [en], bloc: anglo, st: independent, lab: center_left, paywall: metered}
+  - {slug: politico_us, name: POLITICO, domain: politico.com, t: digital_native, tier: 2, c: US, l: [en], bloc: anglo, st: independent, lab: center}
+  - {slug: axios, name: Axios, domain: axios.com, t: digital_native, tier: 2, c: US, l: [en], bloc: anglo, st: independent, lab: center}
+  - {slug: npr, name: NPR, domain: npr.org, t: broadcaster, tier: 2, c: US, l: [en], bloc: anglo, st: public_service_independent, lab: center_left}
+  - {slug: foxnews, name: Fox News, domain: foxnews.com, t: broadcaster, tier: 3, c: US, l: [en], bloc: anglo, st: independent, lab: right}
+  - {slug: cnn, name: CNN, domain: cnn.com, t: broadcaster, tier: 2, c: US, l: [en, es], bloc: anglo, st: independent, lab: center_left}
+  - {slug: nationalreview, name: National Review, domain: nationalreview.com, t: magazine, tier: 3, c: US, l: [en], bloc: anglo, st: independent, lab: right}
+  - {slug: thedispatch, name: The Dispatch, domain: thedispatch.com, t: digital_native, tier: 3, c: US, l: [en], bloc: anglo, st: independent, lab: center_right}
+  - {slug: nypost, name: New York Post, domain: nypost.com, t: newspaper, tier: 3, c: US, l: [en], bloc: anglo, st: independent, lab: right}
+  - {slug: thenation, name: The Nation, domain: thenation.com, t: magazine, tier: 3, c: US, l: [en], bloc: anglo, st: independent, lab: left}
+  - {slug: jacobin, name: Jacobin, domain: jacobin.com, t: magazine, tier: 3, c: US, l: [en, es], bloc: anglo, st: independent, lab: left}
+  - {slug: reason, name: Reason, domain: reason.com, t: magazine, tier: 3, c: US, l: [en], bloc: anglo, st: independent, lab: heterodox}
+  - {slug: theatlantic, name: The Atlantic, domain: theatlantic.com, t: magazine, tier: 2, c: US, l: [en], bloc: anglo, st: independent, lab: center_left, paywall: metered}
+  - {slug: foreignaffairs, name: Foreign Affairs, domain: foreignaffairs.com, t: magazine, tier: 2, c: US, l: [en], bloc: anglo, st: independent, lab: institutional, paywall: metered}
+  - {slug: foreignpolicy, name: Foreign Policy, domain: foreignpolicy.com, t: magazine, tier: 2, c: US, l: [en], bloc: anglo, st: independent, lab: center, paywall: metered}
+  - {slug: americanconservative, name: The American Conservative, domain: theamericanconservative.com, t: magazine, tier: 3, c: US, l: [en], bloc: anglo, st: independent, lab: heterodox}
+  - {slug: responsiblestatecraft, name: Responsible Statecraft, domain: responsiblestatecraft.org, t: magazine, tier: 3, c: US, l: [en], bloc: anglo, st: independent, lab: heterodox}
+  - {slug: globeandmail, name: The Globe and Mail, domain: theglobeandmail.com, t: newspaper, tier: 2, c: CA, l: [en], bloc: anglo, st: independent, lab: center, paywall: metered}
+
+latinoamerica:
+  - {slug: clarin, name: Clarín, domain: clarin.com, t: newspaper, tier: 2, c: AR, l: [es], bloc: latam, st: independent, lab: center_right, paywall: metered}
+  - {slug: lanacion_ar, name: La Nación (AR), domain: lanacion.com.ar, t: newspaper, tier: 2, c: AR, l: [es], bloc: latam, st: independent, lab: center_right, paywall: metered}
+  - {slug: pagina12, name: Página/12, domain: pagina12.com.ar, t: newspaper, tier: 3, c: AR, l: [es], bloc: latam, st: independent, lab: left}
+  - {slug: infobae, name: Infobae, domain: infobae.com, t: digital_native, tier: 2, c: AR, l: [es], bloc: latam, st: independent, lab: center}
+  - {slug: folha, name: Folha de S.Paulo, domain: folha.uol.com.br, t: newspaper, tier: 2, c: BR, l: [pt], bloc: latam, st: independent, lab: center, paywall: metered}
+  - {slug: estadao, name: O Estado de S. Paulo, domain: estadao.com.br, t: newspaper, tier: 2, c: BR, l: [pt], bloc: latam, st: independent, lab: center_right, paywall: metered}
+  - {slug: oglobo, name: O Globo, domain: oglobo.globo.com, t: newspaper, tier: 2, c: BR, l: [pt], bloc: latam, st: independent, lab: center, paywall: metered}
+  - {slug: eluniversal_mx, name: El Universal (MX), domain: eluniversal.com.mx, t: newspaper, tier: 2, c: MX, l: [es], bloc: latam, st: independent, lab: center}
+  - {slug: lajornada, name: La Jornada, domain: jornada.com.mx, t: newspaper, tier: 3, c: MX, l: [es], bloc: latam, st: independent, lab: left}
+  - {slug: reforma, name: Reforma, domain: reforma.com, t: newspaper, tier: 2, c: MX, l: [es], bloc: latam, st: independent, lab: center_right, paywall: hard}
+  - {slug: animalpolitico, name: Animal Político, domain: animalpolitico.com, t: digital_native, tier: 3, c: MX, l: [es], bloc: latam, st: independent, lab: center_left}
+  - {slug: eltiempo, name: El Tiempo, domain: eltiempo.com, t: newspaper, tier: 2, c: CO, l: [es], bloc: latam, st: independent, lab: center_right}
+  - {slug: elespectador, name: El Espectador, domain: elespectador.com, t: newspaper, tier: 2, c: CO, l: [es], bloc: latam, st: independent, lab: center_left}
+  - {slug: elmercurio, name: El Mercurio / Emol, domain: emol.com, t: newspaper, tier: 2, c: CL, l: [es], bloc: latam, st: independent, lab: center_right}
+  - {slug: ciper, name: CIPER Chile, domain: ciperchile.cl, t: digital_native, tier: 3, c: CL, l: [es], bloc: latam, st: independent, lab: center_left}
+  - {slug: elcomercio_pe, name: El Comercio (PE), domain: elcomercio.pe, t: newspaper, tier: 2, c: PE, l: [es], bloc: latam, st: independent, lab: center_right}
+  - {slug: idl_reporteros, name: IDL-Reporteros, domain: idl-reporteros.pe, t: digital_native, tier: 3, c: PE, l: [es], bloc: latam, st: independent, lab: center_left}
+  - {slug: efectococuyo, name: Efecto Cocuyo, domain: efectococuyo.com, t: digital_native, tier: 3, c: VE, l: [es], bloc: latam, st: independent, lab: unknown}
+  - {slug: telesur, name: teleSUR, domain: telesurtv.net, t: state_media, tier: 4, c: VE, l: [es, en], bloc: latam, st: state_controlled, lab: left}
+  - {slug: granma, name: Granma, domain: granma.cu, t: state_media, tier: 4, c: CU, l: [es, en], bloc: latam, st: state_controlled, lab: left}
+
+oriente_medio_turquia_norte_africa:
+  - {slug: aljazeera, name: Al Jazeera, domain: aljazeera.com, t: broadcaster, tier: 2, c: QA, l: [en, ar], bloc: arab, st: state_aligned, lab: unknown}
+  - {slug: alarabiya, name: Al Arabiya, domain: alarabiya.net, t: broadcaster, tier: 3, c: SA, l: [ar, en], bloc: arab, st: state_aligned, lab: unknown}
+  - {slug: asharqalawsat, name: Asharq Al-Awsat, domain: aawsat.com, t: newspaper, tier: 3, c: SA, l: [ar, en], bloc: arab, st: state_aligned, lab: unknown}
+  - {slug: thenational, name: The National (UAE), domain: thenationalnews.com, t: newspaper, tier: 3, c: AE, l: [en], bloc: arab, st: state_aligned, lab: unknown}
+  - {slug: middleeasteye, name: Middle East Eye, domain: middleeasteye.net, t: digital_native, tier: 3, c: GB, l: [en, ar, fr, tr], bloc: arab, st: independent, lab: unknown}
+  - {slug: almonitor, name: Al-Monitor, domain: al-monitor.com, t: digital_native, tier: 2, c: US, l: [en], bloc: arab, st: independent, lab: center, paywall: metered}
+  - {slug: ahram, name: Ahram Online, domain: english.ahram.org.eg, t: state_media, tier: 3, c: EG, l: [en, ar], bloc: arab, st: state_controlled, lab: institutional}
+  - {slug: madamasr, name: Mada Masr, domain: madamasr.com, t: digital_native, tier: 3, c: EG, l: [en, ar], bloc: arab, st: independent, lab: unknown}
+  - {slug: haaretz, name: Haaretz, domain: haaretz.com, t: newspaper, tier: 2, c: IL, l: [en, he], bloc: other_asia, st: independent, lab: left, paywall: metered}
+  - {slug: timesofisrael, name: The Times of Israel, domain: timesofisrael.com, t: digital_native, tier: 2, c: IL, l: [en], bloc: other_asia, st: independent, lab: center}
+  - {slug: jpost, name: The Jerusalem Post, domain: jpost.com, t: newspaper, tier: 3, c: IL, l: [en], bloc: other_asia, st: independent, lab: center_right}
+  - {slug: tehrantimes, name: Tehran Times, domain: tehrantimes.com, t: state_media, tier: 4, c: IR, l: [en], bloc: other_asia, st: state_controlled, lab: institutional}
+  - {slug: iranintl, name: Iran International, domain: iranintl.com, t: broadcaster, tier: 3, c: GB, l: [en, fa], bloc: other_asia, st: independent, lab: unknown}
+  - {slug: hurriyet, name: Hürriyet Daily News, domain: hurriyetdailynews.com, t: newspaper, tier: 3, c: TR, l: [en, tr], bloc: turkey, st: independent, lab: center_right}
+  - {slug: dailysabah, name: Daily Sabah, domain: dailysabah.com, t: newspaper, tier: 3, c: TR, l: [en, tr], bloc: turkey, st: state_aligned, lab: right}
+  - {slug: sozcu, name: Sözcü, domain: sozcu.com.tr, t: newspaper, tier: 3, c: TR, l: [tr], bloc: turkey, st: independent, lab: unknown}
+  - {slug: bianet, name: Bianet, domain: bianet.org, t: digital_native, tier: 3, c: TR, l: [tr, en], bloc: turkey, st: independent, lab: left}
+  - {slug: medyascope, name: Medyascope, domain: medyascope.tv, t: digital_native, tier: 3, c: TR, l: [tr], bloc: turkey, st: independent, lab: unknown}
+  - {slug: trtworld, name: TRT World, domain: trtworld.com, t: state_media, tier: 3, c: TR, l: [en], bloc: turkey, st: state_controlled, lab: institutional}
+  - {slug: lemonde_afrique_mag, name: Jeune Afrique, domain: jeuneafrique.com, t: magazine, tier: 2, c: FR, l: [fr], bloc: africa, st: independent, lab: center, paywall: metered}
+  - {slug: hespress, name: Hespress, domain: hespress.com, t: digital_native, tier: 3, c: MA, l: [ar, fr, en], bloc: arab, st: independent, lab: unknown}
+
+rusia_ucrania_espacio_postsovietico:
+  - {slug: rt, name: RT, domain: rt.com, t: state_media, tier: 4, c: RU, l: [en, es, ar, fr, de, ru], bloc: russia, st: state_controlled, lab: institutional, notes: "Restringido en la UE; acceso solo para análisis de narrativa"}
+  - {slug: ria, name: RIA Novosti, domain: ria.ru, t: state_media, tier: 4, c: RU, l: [ru], bloc: russia, st: state_controlled, lab: institutional}
+  - {slug: kommersant, name: Kommersant, domain: kommersant.ru, t: newspaper, tier: 3, c: RU, l: [ru], bloc: russia, st: independent, lab: unknown}
+  - {slug: meduza, name: Meduza, domain: meduza.io, t: digital_native, tier: 3, c: LV, l: [ru, en], bloc: russia, st: independent, lab: unknown}
+  - {slug: novayagazeta_eu, name: Novaya Gazeta Europe, domain: novayagazeta.eu, t: newspaper, tier: 3, c: LV, l: [ru, en], bloc: russia, st: independent, lab: unknown}
+  - {slug: themoscowtimes, name: The Moscow Times, domain: themoscowtimes.com, t: digital_native, tier: 3, c: NL, l: [en, ru], bloc: russia, st: independent, lab: unknown}
+  - {slug: kyivindependent, name: The Kyiv Independent, domain: kyivindependent.com, t: digital_native, tier: 2, c: UA, l: [en], bloc: russia, st: independent, lab: unknown}
+  - {slug: ukrpravda, name: Ukrainska Pravda, domain: pravda.com.ua, t: digital_native, tier: 3, c: UA, l: [uk, en, ru], bloc: russia, st: independent, lab: unknown}
+  - {slug: rferl, name: Radio Free Europe/Radio Liberty, domain: rferl.org, t: broadcaster, tier: 2, c: CZ, l: [en, ru, uk], bloc: russia, st: state_aligned, lab: unknown, notes: "Financiado por EE. UU.; verificar estado actual"}
+  - {slug: eurasianet, name: Eurasianet, domain: eurasianet.org, t: digital_native, tier: 2, c: US, l: [en, ru], bloc: russia, st: independent, lab: center}
+
+china_asia_pacifico:
+  - {slug: scmp, name: South China Morning Post, domain: scmp.com, t: newspaper, tier: 2, c: HK, l: [en], bloc: china, st: independent, lab: unknown, paywall: metered}
+  - {slug: globaltimes, name: Global Times, domain: globaltimes.cn, t: state_media, tier: 4, c: CN, l: [en, zh], bloc: china, st: state_controlled, lab: institutional}
+  - {slug: chinadaily, name: China Daily, domain: chinadaily.com.cn, t: state_media, tier: 4, c: CN, l: [en], bloc: china, st: state_controlled, lab: institutional}
+  - {slug: peoplesdaily, name: People's Daily, domain: en.people.cn, t: state_media, tier: 4, c: CN, l: [en, zh], bloc: china, st: state_controlled, lab: institutional}
+  - {slug: caixin, name: Caixin Global, domain: caixinglobal.com, t: magazine, tier: 2, c: CN, l: [en, zh], bloc: china, st: independent, lab: unknown, paywall: hard}
+  - {slug: sixthtone, name: Sixth Tone, domain: sixthtone.com, t: digital_native, tier: 3, c: CN, l: [en], bloc: china, st: state_aligned, lab: unknown}
+  - {slug: taipeitimes, name: Taipei Times, domain: taipeitimes.com, t: newspaper, tier: 2, c: TW, l: [en], bloc: china, st: independent, lab: unknown}
+  - {slug: focustaiwan, name: Focus Taiwan (CNA), domain: focustaiwan.tw, t: wire, tier: 2, c: TW, l: [en, zh], bloc: china, st: public_service_independent, lab: center}
+  - {slug: nikkei, name: Nikkei Asia, domain: asia.nikkei.com, t: newspaper, tier: 2, c: JP, l: [en], bloc: japan_korea, st: independent, lab: center, paywall: hard}
+  - {slug: japantimes, name: The Japan Times, domain: japantimes.co.jp, t: newspaper, tier: 2, c: JP, l: [en], bloc: japan_korea, st: independent, lab: center}
+  - {slug: asahi, name: Asahi Shimbun, domain: asahi.com, t: newspaper, tier: 2, c: JP, l: [ja, en], bloc: japan_korea, st: independent, lab: center_left}
+  - {slug: yomiuri, name: Yomiuri Shimbun (The Japan News), domain: japannews.yomiuri.co.jp, t: newspaper, tier: 2, c: JP, l: [en, ja], bloc: japan_korea, st: independent, lab: center_right}
+  - {slug: koreaherald, name: The Korea Herald, domain: koreaherald.com, t: newspaper, tier: 2, c: KR, l: [en], bloc: japan_korea, st: independent, lab: center_right}
+  - {slug: hankyoreh, name: Hankyoreh, domain: english.hani.co.kr, t: newspaper, tier: 2, c: KR, l: [en, ko], bloc: japan_korea, st: independent, lab: center_left}
+  - {slug: straitstimes, name: The Straits Times, domain: straitstimes.com, t: newspaper, tier: 2, c: SG, l: [en], bloc: other_asia, st: state_aligned, lab: institutional, paywall: metered}
+  - {slug: rappler, name: Rappler, domain: rappler.com, t: digital_native, tier: 3, c: PH, l: [en], bloc: other_asia, st: independent, lab: unknown}
+  - {slug: jakartapost, name: The Jakarta Post, domain: thejakartapost.com, t: newspaper, tier: 2, c: ID, l: [en], bloc: other_asia, st: independent, lab: center}
+  - {slug: thediplomat, name: The Diplomat, domain: thediplomat.com, t: magazine, tier: 2, c: US, l: [en], bloc: other_asia, st: independent, lab: center, paywall: metered}
+  - {slug: abc_au, name: ABC News (Australia), domain: abc.net.au, t: broadcaster, tier: 2, c: AU, l: [en], bloc: oceania, st: public_service_independent, lab: center}
+  - {slug: aspi_strategist, name: The Strategist (ASPI), domain: aspistrategist.org.au, t: think_tank, tier: 3, c: AU, l: [en], bloc: oceania, st: independent, lab: center}
+
+india_sur_asia:
+  - {slug: thehindu, name: The Hindu, domain: thehindu.com, t: newspaper, tier: 2, c: IN, l: [en], bloc: india, st: independent, lab: center_left, paywall: metered}
+  - {slug: indianexpress, name: The Indian Express, domain: indianexpress.com, t: newspaper, tier: 2, c: IN, l: [en], bloc: india, st: independent, lab: center}
+  - {slug: timesofindia, name: The Times of India, domain: timesofindia.indiatimes.com, t: newspaper, tier: 3, c: IN, l: [en], bloc: india, st: independent, lab: center_right}
+  - {slug: thewire_in, name: The Wire, domain: thewire.in, t: digital_native, tier: 3, c: IN, l: [en, hi], bloc: india, st: independent, lab: left}
+  - {slug: swarajya, name: Swarajya, domain: swarajyamag.com, t: magazine, tier: 3, c: IN, l: [en], bloc: india, st: independent, lab: right}
+  - {slug: dawn, name: Dawn, domain: dawn.com, t: newspaper, tier: 2, c: PK, l: [en], bloc: other_asia, st: independent, lab: center}
+
+africa_subsahariana:
+  - {slug: dailymaverick, name: Daily Maverick, domain: dailymaverick.co.za, t: digital_native, tier: 2, c: ZA, l: [en], bloc: africa, st: independent, lab: center_left}
+  - {slug: news24, name: News24, domain: news24.com, t: digital_native, tier: 2, c: ZA, l: [en], bloc: africa, st: independent, lab: center}
+  - {slug: nationafrica, name: Nation (Kenya), domain: nation.africa, t: newspaper, tier: 2, c: KE, l: [en], bloc: africa, st: independent, lab: center}
+  - {slug: premiumtimes, name: Premium Times, domain: premiumtimesng.com, t: digital_native, tier: 2, c: NG, l: [en], bloc: africa, st: independent, lab: center}
+  - {slug: punchng, name: The Punch, domain: punchng.com, t: newspaper, tier: 3, c: NG, l: [en], bloc: africa, st: independent, lab: unknown}
+  - {slug: addisstandard, name: Addis Standard, domain: addisstandard.com, t: magazine, tier: 3, c: ET, l: [en], bloc: africa, st: independent, lab: unknown}
+  - {slug: theeastafrican, name: The EastAfrican, domain: theeastafrican.co.ke, t: newspaper, tier: 2, c: KE, l: [en], bloc: africa, st: independent, lab: center}
+  - {slug: africareport, name: The Africa Report, domain: theafricareport.com, t: magazine, tier: 2, c: FR, l: [en, fr], bloc: africa, st: independent, lab: center}
+  - {slug: rfi_afrique, name: RFI, domain: rfi.fr, t: broadcaster, tier: 2, c: FR, l: [fr, en, es, pt], bloc: africa, st: public_service_independent, lab: center}
+  - {slug: allafrica, name: AllAfrica (agregador), domain: allafrica.com, t: digital_native, tier: 3, c: US, l: [en, fr], bloc: africa, st: independent, lab: unknown}
+
+think_tanks:
+  - {slug: brookings, name: Brookings, domain: brookings.edu, t: think_tank, tier: 3, c: US, l: [en], bloc: anglo, lab: center_left}
+  - {slug: aei, name: American Enterprise Institute, domain: aei.org, t: think_tank, tier: 3, c: US, l: [en], bloc: anglo, lab: center_right}
+  - {slug: heritage, name: Heritage Foundation, domain: heritage.org, t: think_tank, tier: 3, c: US, l: [en], bloc: anglo, lab: right}
+  - {slug: cato, name: Cato Institute, domain: cato.org, t: think_tank, tier: 3, c: US, l: [en], bloc: anglo, lab: heterodox}
+  - {slug: cap, name: Center for American Progress, domain: americanprogress.org, t: think_tank, tier: 3, c: US, l: [en], bloc: anglo, lab: left}
+  - {slug: cfr, name: Council on Foreign Relations, domain: cfr.org, t: think_tank, tier: 2, c: US, l: [en], bloc: anglo, lab: institutional}
+  - {slug: csis, name: CSIS, domain: csis.org, t: think_tank, tier: 2, c: US, l: [en], bloc: anglo, lab: center}
+  - {slug: rand, name: RAND, domain: rand.org, t: think_tank, tier: 2, c: US, l: [en], bloc: anglo, lab: center}
+  - {slug: carnegie, name: Carnegie Endowment, domain: carnegieendowment.org, t: think_tank, tier: 2, c: US, l: [en], bloc: global, lab: center}
+  - {slug: piie, name: Peterson Institute (PIIE), domain: piie.com, t: think_tank, tier: 2, c: US, l: [en], bloc: anglo, lab: center}
+  - {slug: quincy, name: Quincy Institute, domain: quincyinst.org, t: think_tank, tier: 3, c: US, l: [en], bloc: anglo, lab: heterodox}
+  - {slug: chatham, name: Chatham House, domain: chathamhouse.org, t: think_tank, tier: 2, c: GB, l: [en], bloc: anglo, lab: institutional}
+  - {slug: iiss, name: IISS, domain: iiss.org, t: think_tank, tier: 2, c: GB, l: [en], bloc: global, lab: center}
+  - {slug: rusi, name: RUSI, domain: rusi.org, t: think_tank, tier: 2, c: GB, l: [en], bloc: anglo, lab: center}
+  - {slug: ecfr, name: European Council on Foreign Relations, domain: ecfr.eu, t: think_tank, tier: 2, c: DE, l: [en], bloc: eu, lab: center}
+  - {slug: bruegel, name: Bruegel, domain: bruegel.org, t: think_tank, tier: 2, c: BE, l: [en], bloc: eu, lab: center}
+  - {slug: cer, name: Centre for European Reform, domain: cer.eu, t: think_tank, tier: 2, c: GB, l: [en], bloc: eu, lab: center}
+  - {slug: swp, name: SWP Berlin, domain: swp-berlin.org, t: think_tank, tier: 2, c: DE, l: [de, en], bloc: eu, lab: institutional}
+  - {slug: ifri, name: Ifri, domain: ifri.org, t: think_tank, tier: 2, c: FR, l: [fr, en], bloc: eu, lab: center}
+  - {slug: elcano, name: Real Instituto Elcano, domain: realinstitutoelcano.org, t: think_tank, tier: 2, c: ES, l: [es, en], bloc: es, lab: institutional}
+  - {slug: cidob, name: CIDOB, domain: cidob.org, t: think_tank, tier: 2, c: ES, l: [es, en, ca], bloc: es, lab: center}
+  - {slug: fedea, name: FEDEA, domain: fedea.net, t: think_tank, tier: 2, c: ES, l: [es], bloc: es, lab: center}
+  - {slug: funcas, name: Funcas, domain: funcas.es, t: think_tank, tier: 2, c: ES, l: [es], bloc: es, lab: center}
+  - {slug: iea_es, name: Instituto de Estudios Económicos, domain: ieemadrid.es, t: think_tank, tier: 3, c: ES, l: [es], bloc: es, lab: center_right}
+  - {slug: fundacionalternativas, name: Fundación Alternativas, domain: fundacionalternativas.org, t: think_tank, tier: 3, c: ES, l: [es], bloc: es, lab: center_left}
+  - {slug: valdai, name: Valdai Club, domain: valdaiclub.com, t: think_tank, tier: 3, c: RU, l: [en, ru], bloc: russia, lab: institutional, st: state_aligned}
+  - {slug: ciis, name: China Institute of International Studies, domain: ciis.org.cn, t: think_tank, tier: 3, c: CN, l: [en, zh], bloc: china, lab: institutional, st: state_controlled}
+  - {slug: orf, name: Observer Research Foundation, domain: orfonline.org, t: think_tank, tier: 2, c: IN, l: [en], bloc: india, lab: center}
+  - {slug: setav, name: SETA, domain: setav.org, t: think_tank, tier: 3, c: TR, l: [tr, en], bloc: turkey, lab: right, st: state_aligned}
+  - {slug: crisisgroup, name: International Crisis Group, domain: crisisgroup.org, t: think_tank, tier: 2, c: BE, l: [en, fr, es, ar], bloc: global, lab: center}
+  - {slug: isw, name: Institute for the Study of War, domain: understandingwar.org, t: think_tank, tier: 3, c: US, l: [en], bloc: anglo, lab: unknown}
+
+instituciones_y_primarias:
+  # Unión Europea
+  - {slug: ec_press, name: Comisión Europea — Sala de prensa, domain: ec.europa.eu, t: institution, tier: 1, c: EU, l: [en, es, fr, de], bloc: eu}
+  - {slug: eurlex, name: EUR-Lex, domain: eur-lex.europa.eu, t: institution, tier: 1, c: EU, l: [es, en], bloc: eu, access: [api]}
+  - {slug: europarl, name: Parlamento Europeo (datos abiertos), domain: data.europarl.europa.eu, t: institution, tier: 1, c: EU, l: [en, es], bloc: eu, access: [api]}
+  - {slug: consilium, name: Consejo de la UE, domain: consilium.europa.eu, t: institution, tier: 1, c: EU, l: [en, es], bloc: eu}
+  - {slug: curia, name: TJUE (CURIA), domain: curia.europa.eu, t: court, tier: 1, c: EU, l: [en, es, fr], bloc: eu}
+  - {slug: eurostat, name: Eurostat, domain: ec.europa.eu/eurostat, t: statistical_office, tier: 1, c: EU, l: [en], bloc: eu, access: [api]}
+  - {slug: ecb, name: Banco Central Europeo, domain: ecb.europa.eu, t: central_bank, tier: 1, c: EU, l: [en], bloc: eu, access: [rss, api]}
+  # España
+  - {slug: boe, name: BOE, domain: boe.es, t: institution, tier: 1, c: ES, l: [es], bloc: es, access: [api]}
+  - {slug: congreso, name: Congreso de los Diputados, domain: congreso.es, t: institution, tier: 1, c: ES, l: [es], bloc: es, access: [api]}
+  - {slug: lamoncloa, name: La Moncloa, domain: lamoncloa.gob.es, t: institution, tier: 1, c: ES, l: [es], bloc: es}
+  - {slug: bde, name: Banco de España, domain: bde.es, t: central_bank, tier: 1, c: ES, l: [es, en], bloc: es}
+  - {slug: ine, name: INE, domain: ine.es, t: statistical_office, tier: 1, c: ES, l: [es], bloc: es, access: [api]}
+  - {slug: cis, name: CIS, domain: cis.es, t: institution, tier: 1, c: ES, l: [es], bloc: es}
+  - {slug: tc_es, name: Tribunal Constitucional, domain: tribunalconstitucional.es, t: court, tier: 1, c: ES, l: [es], bloc: es}
+  - {slug: airef, name: AIReF, domain: airef.es, t: institution, tier: 1, c: ES, l: [es], bloc: es}
+  # Estados Unidos
+  - {slug: whitehouse, name: The White House, domain: whitehouse.gov, t: institution, tier: 1, c: US, l: [en], bloc: anglo}
+  - {slug: congress_gov, name: Congress.gov, domain: congress.gov, t: institution, tier: 1, c: US, l: [en], bloc: anglo, access: [api]}
+  - {slug: federalregister, name: Federal Register, domain: federalregister.gov, t: institution, tier: 1, c: US, l: [en], bloc: anglo, access: [api]}
+  - {slug: fed, name: Federal Reserve, domain: federalreserve.gov, t: central_bank, tier: 1, c: US, l: [en], bloc: anglo, access: [rss]}
+  - {slug: bls, name: BLS, domain: bls.gov, t: statistical_office, tier: 1, c: US, l: [en], bloc: anglo, access: [api]}
+  - {slug: bea, name: BEA, domain: bea.gov, t: statistical_office, tier: 1, c: US, l: [en], bloc: anglo, access: [api]}
+  - {slug: scotus, name: Supreme Court of the United States, domain: supremecourt.gov, t: court, tier: 1, c: US, l: [en], bloc: anglo}
+  - {slug: state_dept, name: US Department of State, domain: state.gov, t: institution, tier: 1, c: US, l: [en], bloc: anglo}
+  - {slug: treasury_ofac, name: US Treasury / OFAC, domain: treasury.gov, t: institution, tier: 1, c: US, l: [en], bloc: anglo}
+  - {slug: sec_edgar, name: SEC EDGAR, domain: sec.gov, t: institution, tier: 1, c: US, l: [en], bloc: anglo, access: [api]}
+  # Otros bancos centrales e instituciones nacionales
+  - {slug: boe_uk, name: Bank of England, domain: bankofengland.co.uk, t: central_bank, tier: 1, c: GB, l: [en], bloc: anglo}
+  - {slug: boj, name: Bank of Japan, domain: boj.or.jp, t: central_bank, tier: 1, c: JP, l: [en, ja], bloc: japan_korea}
+  - {slug: pboc, name: People's Bank of China, domain: pbc.gov.cn, t: central_bank, tier: 1, c: CN, l: [zh, en], bloc: china}
+  - {slug: snb, name: Swiss National Bank, domain: snb.ch, t: central_bank, tier: 1, c: CH, l: [en, de, fr], bloc: eu}
+  - {slug: cbrt, name: Türkiye Cumhuriyet Merkez Bankası, domain: tcmb.gov.tr, t: central_bank, tier: 1, c: TR, l: [tr, en], bloc: turkey}
+  - {slug: banxico, name: Banco de México, domain: banxico.org.mx, t: central_bank, tier: 1, c: MX, l: [es], bloc: latam}
+  - {slug: bcb, name: Banco Central do Brasil, domain: bcb.gov.br, t: central_bank, tier: 1, c: BR, l: [pt, en], bloc: latam}
+  - {slug: rbi, name: Reserve Bank of India, domain: rbi.org.in, t: central_bank, tier: 1, c: IN, l: [en], bloc: india}
+  - {slug: kremlin, name: Kremlin (en), domain: en.kremlin.ru, t: institution, tier: 1, c: RU, l: [en, ru], bloc: russia, st: state_controlled}
+  - {slug: mfa_china, name: MFA China — ruedas de prensa, domain: fmprc.gov.cn, t: institution, tier: 1, c: CN, l: [en, zh], bloc: china, st: state_controlled}
+  - {slug: gov_uk, name: GOV.UK, domain: gov.uk, t: institution, tier: 1, c: GB, l: [en], bloc: anglo}
+  - {slug: elysee, name: Élysée, domain: elysee.fr, t: institution, tier: 1, c: FR, l: [fr, en], bloc: eu}
+  - {slug: bundesregierung, name: Bundesregierung, domain: bundesregierung.de, t: institution, tier: 1, c: DE, l: [de, en], bloc: eu}
+  - {slug: gouv_mc, name: Gouvernement Princier de Monaco, domain: gouv.mc, t: institution, tier: 1, c: MC, l: [fr], bloc: eu}
+  - {slug: govern_ad, name: Govern d'Andorra, domain: govern.ad, t: institution, tier: 1, c: AD, l: [ca], bloc: eu}
+  - {slug: bopa, name: BOPA (Andorra), domain: bopa.ad, t: institution, tier: 1, c: AD, l: [ca], bloc: eu}
+  # Organismos internacionales
+  - {slug: un_news, name: UN News, domain: news.un.org, t: intl_org, tier: 1, c: UN, l: [en, es, fr, ar, ru, zh], bloc: global}
+  - {slug: un_press, name: UN Meetings Coverage & Press Releases, domain: press.un.org, t: intl_org, tier: 1, c: UN, l: [en, fr], bloc: global}
+  - {slug: undl, name: UN Digital Library (votaciones), domain: digitallibrary.un.org, t: intl_org, tier: 1, c: UN, l: [en], bloc: global, access: [api]}
+  - {slug: imf, name: FMI, domain: imf.org, t: intl_org, tier: 1, c: UN, l: [en, es], bloc: global, access: [api]}
+  - {slug: worldbank, name: Banco Mundial, domain: worldbank.org, t: intl_org, tier: 1, c: UN, l: [en, es], bloc: global, access: [api]}
+  - {slug: oecd, name: OCDE, domain: oecd.org, t: intl_org, tier: 1, c: FR, l: [en, fr], bloc: global, access: [api]}
+  - {slug: bis, name: BIS, domain: bis.org, t: intl_org, tier: 1, c: CH, l: [en], bloc: global, access: [api]}
+  - {slug: wto, name: OMC, domain: wto.org, t: intl_org, tier: 1, c: CH, l: [en, es, fr], bloc: global}
+  - {slug: who, name: OMS, domain: who.int, t: intl_org, tier: 1, c: CH, l: [en, es, fr], bloc: global, access: [api]}
+  - {slug: nato, name: OTAN, domain: nato.int, t: intl_org, tier: 1, c: BE, l: [en, fr], bloc: global}
+  - {slug: iaea, name: OIEA, domain: iaea.org, t: intl_org, tier: 1, c: AT, l: [en], bloc: global}
+  - {slug: opec, name: OPEP, domain: opec.org, t: intl_org, tier: 1, c: AT, l: [en], bloc: global}
+  - {slug: iea, name: Agencia Internacional de la Energía, domain: iea.org, t: intl_org, tier: 1, c: FR, l: [en], bloc: global}
+  - {slug: echr, name: TEDH (HUDOC), domain: hudoc.echr.coe.int, t: court, tier: 1, c: FR, l: [en, fr], bloc: eu}
+  - {slug: icj, name: Corte Internacional de Justicia, domain: icj-cij.org, t: court, tier: 1, c: NL, l: [en, fr], bloc: global}
+  - {slug: ema, name: Agencia Europea de Medicamentos, domain: ema.europa.eu, t: institution, tier: 1, c: EU, l: [en], bloc: eu}
+  - {slug: fda, name: FDA, domain: fda.gov, t: institution, tier: 1, c: US, l: [en], bloc: anglo}
+
+datos_y_eventos_estructurados:
+  - {slug: gdelt, name: GDELT Project, domain: gdeltproject.org, t: data_api, tier: 2, bloc: global, access: [api]}
+  - {slug: acled, name: ACLED (+CAST), domain: acleddata.com, t: data_api, tier: 1, bloc: global, access: [api], notes: "Cuenta gratuita; atribución obligatoria; uso no comercial"}
+  - {slug: mediacloud, name: Media Cloud, domain: mediacloud.org, t: data_api, tier: 2, bloc: global, access: [api]}
+  - {slug: polymarket, name: Polymarket (Gamma API), domain: polymarket.com, t: data_api, tier: 2, bloc: global, access: [api], notes: "Solo lectura"}
+  - {slug: kalshi, name: Kalshi, domain: kalshi.com, t: data_api, tier: 2, bloc: anglo, access: [api], notes: "Solo lectura"}
+  - {slug: metaculus, name: Metaculus, domain: metaculus.com, t: data_api, tier: 2, bloc: global, access: [api]}
+  - {slug: manifold, name: Manifold, domain: manifold.markets, t: data_api, tier: 3, bloc: global, access: [api]}
+  - {slug: opensanctions, name: OpenSanctions, domain: opensanctions.org, t: data_api, tier: 1, bloc: global, access: [api]}
+  - {slug: openalex, name: OpenAlex, domain: openalex.org, t: data_api, tier: 1, bloc: global, access: [api]}
+  - {slug: wikidata, name: Wikidata, domain: wikidata.org, t: data_api, tier: 2, bloc: global, access: [api]}
+  - {slug: clinicaltrials, name: ClinicalTrials.gov, domain: clinicaltrials.gov, t: data_api, tier: 1, bloc: global, access: [api]}
+  - {slug: owid, name: Our World in Data, domain: ourworldindata.org, t: data_api, tier: 1, bloc: global, access: [api]}
+
+filosofia_e_ideas:
+  - {slug: sep, name: Stanford Encyclopedia of Philosophy, domain: plato.stanford.edu, t: academic, tier: 1, bloc: global, access: [metadata_only], notes: "Enlazar; no reproducir"}
+  - {slug: iep, name: Internet Encyclopedia of Philosophy, domain: iep.utm.edu, t: academic, tier: 1, bloc: global, access: [metadata_only]}
+  - {slug: philpapers, name: PhilPapers, domain: philpapers.org, t: academic, tier: 1, bloc: global, access: [api]}
+  - {slug: gutenberg, name: Project Gutenberg, domain: gutenberg.org, t: academic, tier: 1, bloc: global, notes: "Dominio público"}
+  - {slug: perseus, name: Perseus Digital Library, domain: perseus.tufts.edu, t: academic, tier: 1, bloc: global}
+  - {slug: aeon, name: Aeon, domain: aeon.co, t: magazine, tier: 3, bloc: anglo, lab: unknown}
+  - {slug: projectsyndicate, name: Project Syndicate, domain: project-syndicate.org, t: magazine, tier: 3, bloc: global, lab: center, paywall: metered}
+  - {slug: voxeu, name: VoxEU (CEPR), domain: cepr.org/voxeu, t: academic, tier: 2, bloc: eu, lab: center}
+  - {slug: nber, name: NBER Working Papers, domain: nber.org, t: academic, tier: 1, bloc: anglo, lab: center}
+  - {slug: noahpinion, name: Noahpinion (Substack), domain: noahpinion.blog, t: newsletter, tier: 3, bloc: anglo, lab: center_left}
+  - {slug: marginalrevolution, name: Marginal Revolution, domain: marginalrevolution.com, t: newsletter, tier: 3, bloc: anglo, lab: heterodox}
+  - {slug: nadaesgratis, name: Nada es Gratis, domain: nadaesgratis.es, t: newsletter, tier: 3, bloc: es, lab: center}
+
+salud_global_y_ciencia:
+  - {slug: statnews, name: STAT, domain: statnews.com, t: digital_native, tier: 2, c: US, l: [en], bloc: anglo, lab: center}
+  - {slug: healthpolicywatch, name: Health Policy Watch, domain: healthpolicy-watch.news, t: digital_native, tier: 3, c: CH, l: [en], bloc: global, lab: center}
+  - {slug: lancet, name: The Lancet (noticias y comentarios), domain: thelancet.com, t: academic, tier: 1, bloc: global, access: [metadata_only]}
+  - {slug: nature_news, name: Nature News, domain: nature.com, t: academic, tier: 2, bloc: global, access: [metadata_only]}
+  - {slug: science_news, name: Science (noticias), domain: science.org, t: academic, tier: 2, bloc: global, access: [metadata_only]}
+  - {slug: kff, name: KFF Health News, domain: kffhealthnews.org, t: digital_native, tier: 2, c: US, l: [en], bloc: anglo, lab: center}
+
+# Bloques pendientes para la fase 3 (curador-fuentes): ampliar con el directorio de Media Cloud hasta ~1.500 fuentes,
+# equilibrando ecosistemas dentro de cada país de nivel A/B, y añadir las listas epistemológicas de Bluesky/X
+# (economistas, teoría política, geopolítica, defensa, instituciones UE, política ES/EE. UU., Oriente Medio,
+# China, Rusia, IA, energía, mercados, salud global).
