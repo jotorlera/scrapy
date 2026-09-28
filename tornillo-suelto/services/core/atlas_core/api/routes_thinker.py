@@ -24,7 +24,12 @@ router = APIRouter()
 @router.get("/agora/maps")
 def list_maps() -> dict[str, Any]:
     d = db()
-    maps = [dict(r) for r in d.all("SELECT m.*, (SELECT COUNT(*) FROM argument_node n WHERE n.map_id = m.id) AS n_nodes FROM argument_map m ORDER BY created_at")]
+    maps = [
+        dict(r)
+        for r in d.all(
+            "SELECT m.*, (SELECT COUNT(*) FROM argument_node n WHERE n.map_id = m.id) AS n_nodes FROM argument_map m ORDER BY created_at"
+        )
+    ]
     return {"maps": maps}
 
 
@@ -38,7 +43,10 @@ def create_map(body: MapIn) -> dict[str, Any]:
     d = db()
     mid = new_id()
     with d.tx() as conn:
-        conn.execute("INSERT INTO argument_map(id, title, topic, created_at) VALUES (?,?,?,?)", (mid, body.title, body.topic, now_iso()))
+        conn.execute(
+            "INSERT INTO argument_map(id, title, topic, created_at) VALUES (?,?,?,?)",
+            (mid, body.title, body.topic, now_iso()),
+        )
     return {"id": mid}
 
 
@@ -47,8 +55,18 @@ def _map_analysis(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -> d
     incoming: dict[str, list[dict[str, Any]]] = {n["id"]: [] for n in nodes}
     for e in edges:
         incoming.setdefault(e["dst"], []).append(e)
-    unsupported = [n for n in nodes if n["kind"] in ("thesis", "premise") and not any(e["rel"] == "supports" for e in incoming.get(n["id"], []))]
-    unanswered = [n for n in nodes if n["kind"] == "objection" and not any(e["rel"] in ("replies", "attacks") for e in incoming.get(n["id"], []))]
+    unsupported = [
+        n
+        for n in nodes
+        if n["kind"] in ("thesis", "premise")
+        and not any(e["rel"] == "supports" for e in incoming.get(n["id"], []))
+    ]
+    unanswered = [
+        n
+        for n in nodes
+        if n["kind"] == "objection"
+        and not any(e["rel"] in ("replies", "attacks") for e in incoming.get(n["id"], []))
+    ]
     adj: dict[str, list[str]] = {}
     for e in edges:
         if e["rel"] == "supports":
@@ -71,7 +89,11 @@ def _map_analysis(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -> d
     for n in nodes:
         if color.get(n["id"], 0) == 0:
             dfs(n["id"])
-    return {"unsupported": [{"id": n["id"], "text": n["text"][:120]} for n in unsupported], "unanswered_objections": [{"id": n["id"], "text": n["text"][:120]} for n in unanswered], "support_cycles": cycles[:5]}
+    return {
+        "unsupported": [{"id": n["id"], "text": n["text"][:120]} for n in unsupported],
+        "unanswered_objections": [{"id": n["id"], "text": n["text"][:120]} for n in unanswered],
+        "support_cycles": cycles[:5],
+    }
 
 
 @router.get("/agora/maps/{map_id}")
@@ -80,7 +102,9 @@ def get_map(map_id: str) -> dict[str, Any]:
     m = d.one("SELECT * FROM argument_map WHERE id = ?", (map_id,))
     if not m:
         raise HTTPException(404, "mapa no encontrado")
-    nodes = [dict(r) for r in d.all("SELECT * FROM argument_node WHERE map_id = ? ORDER BY created_at", (map_id,))]
+    nodes = [
+        dict(r) for r in d.all("SELECT * FROM argument_node WHERE map_id = ? ORDER BY created_at", (map_id,))
+    ]
     edges = [dict(r) for r in d.all("SELECT * FROM argument_edge WHERE map_id = ?", (map_id,))]
     return {"map": dict(m), "nodes": nodes, "edges": edges, "analysis": _map_analysis(nodes, edges)}
 
@@ -101,7 +125,10 @@ def add_node(map_id: str, body: NodeIn) -> dict[str, Any]:
     d = db()
     nid = new_id()
     with d.tx() as conn:
-        conn.execute("INSERT INTO argument_node(id, map_id, kind, text, author, work, is_user, x, y, created_at) VALUES (?,?,?,?,?,?,1,?,?,?)", (nid, map_id, body.kind, body.text, body.author, body.work, body.x, body.y, now_iso()))
+        conn.execute(
+            "INSERT INTO argument_node(id, map_id, kind, text, author, work, is_user, x, y, created_at) VALUES (?,?,?,?,?,?,1,?,?,?)",
+            (nid, map_id, body.kind, body.text, body.author, body.work, body.x, body.y, now_iso()),
+        )
     return {"id": nid}
 
 
@@ -144,7 +171,10 @@ def add_edge(map_id: str, body: EdgeIn) -> dict[str, Any]:
     d = db()
     eid = new_id()
     with d.tx() as conn:
-        conn.execute("INSERT INTO argument_edge(id, map_id, src, dst, rel) VALUES (?,?,?,?,?)", (eid, map_id, body.src, body.dst, body.rel))
+        conn.execute(
+            "INSERT INTO argument_edge(id, map_id, src, dst, rel) VALUES (?,?,?,?,?)",
+            (eid, map_id, body.src, body.dst, body.rel),
+        )
     return {"id": eid}
 
 
@@ -187,7 +217,9 @@ def cases(q: str | None = None, category: str | None = None) -> dict[str, Any]:
 
 
 @router.get("/archive/analogs")
-def archive_analogs(q: str | None = None, event_id: str | None = None, category: str | None = None, n: int = 4) -> dict[str, Any]:
+def archive_analogs(
+    q: str | None = None, event_id: str | None = None, category: str | None = None, n: int = 4
+) -> dict[str, Any]:
     d = db()
     text = q or ""
     if event_id:
@@ -197,7 +229,12 @@ def archive_analogs(q: str | None = None, event_id: str | None = None, category:
     if not text.strip():
         raise HTTPException(400, "q o event_id requerido")
     res = analogs(d, text, top_n=n, category=category)
-    return {"query": text, "analogs": res, "compare": compare_cases(res) if res else None, "note": "Similitud por embeddings locales sobre casos codificados a mano; verificar antes de citar."}
+    return {
+        "query": text,
+        "analogs": res,
+        "compare": compare_cases(res) if res else None,
+        "note": "Similitud por embeddings locales sobre casos codificados a mano; verificar antes de citar.",
+    }
 
 
 # ───────────── PRONÓSTICOS ─────────────
@@ -209,7 +246,10 @@ def _question_out(d, r) -> dict[str, Any]:
     q["market_links"] = loads(q["market_links"], [])
     q["options"] = loads(q["options"], None)
     q["outcome"] = loads(q["outcome"], None)
-    fc = d.all("SELECT forecaster, probability, rationale, made_at FROM forecast WHERE question_id = ? ORDER BY made_at", (q["id"],))
+    fc = d.all(
+        "SELECT forecaster, probability, rationale, made_at FROM forecast WHERE question_id = ? ORDER BY made_at",
+        (q["id"],),
+    )
     latest: dict[str, Any] = {}
     series: list[dict[str, Any]] = []
     for f in fc:
@@ -219,7 +259,10 @@ def _question_out(d, r) -> dict[str, Any]:
     q["series"] = series
     q["scores"] = [dict(s) for s in d.all("SELECT * FROM forecast_score WHERE question_id = ?", (q["id"],))]
     if q["market_links"]:
-        m = d.one("SELECT probability, venue, url, fetched_at FROM prediction_market WHERE id = ?", (q["market_links"][0].get("id"),))
+        m = d.one(
+            "SELECT probability, venue, url, fetched_at FROM prediction_market WHERE id = ?",
+            (q["market_links"][0].get("id"),),
+        )
         q["market"] = dict(m) if m else None
     else:
         q["market"] = None
@@ -262,10 +305,37 @@ def create_question(body: QuestionIn) -> dict[str, Any]:
         conn.execute(
             """INSERT INTO forecast_question(id, title, resolution_criteria, resolution_source, kind, open_at, close_at, resolve_by, origin_event_id, domain, countries, base_rate, base_rate_note, market_links, status, created_by)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (qid, body.title, body.resolution_criteria, body.resolution_source, "binary", now_iso(), body.close_at, body.resolve_by or body.close_at, body.origin_event_id, body.domain, dumps(body.countries), body.base_rate, body.base_rate_note, dumps([]), "open", "user"),
+            (
+                qid,
+                body.title,
+                body.resolution_criteria,
+                body.resolution_source,
+                "binary",
+                now_iso(),
+                body.close_at,
+                body.resolve_by or body.close_at,
+                body.origin_event_id,
+                body.domain,
+                dumps(body.countries),
+                body.base_rate,
+                body.base_rate_note,
+                dumps([]),
+                "open",
+                "user",
+            ),
         )
         if body.base_rate is not None:
-            conn.execute("INSERT INTO forecast(id, question_id, forecaster, probability, rationale, made_at) VALUES (?,?,?,?,?,?)", (new_id(), qid, "base_rate", body.base_rate, body.base_rate_note or "tasa base declarada", now_iso()))
+            conn.execute(
+                "INSERT INTO forecast(id, question_id, forecaster, probability, rationale, made_at) VALUES (?,?,?,?,?,?)",
+                (
+                    new_id(),
+                    qid,
+                    "base_rate",
+                    body.base_rate,
+                    body.base_rate_note or "tasa base declarada",
+                    now_iso(),
+                ),
+            )
     return {"id": qid}
 
 
@@ -283,11 +353,20 @@ def calibration(forecaster: str = "user") -> dict[str, Any]:
         if "value" in o:
             pairs.append((float(r["probability"]), int(o["value"])))
     cal = fmath.calibration(pairs)
-    forecasters = [r["forecaster"] for r in d.all("SELECT DISTINCT forecaster FROM forecast_score ORDER BY forecaster")]
-    summary = [dict(r) for r in d.all("SELECT forecaster, COUNT(*) n, AVG(brier) brier, AVG(log_score) log_score FROM forecast_score GROUP BY forecaster ORDER BY brier")]
+    forecasters = [
+        r["forecaster"] for r in d.all("SELECT DISTINCT forecaster FROM forecast_score ORDER BY forecaster")
+    ]
+    summary = [
+        dict(r)
+        for r in d.all(
+            "SELECT forecaster, COUNT(*) n, AVG(brier) brier, AVG(log_score) log_score FROM forecast_score GROUP BY forecaster ORDER BY brier"
+        )
+    ]
     base = next((s for s in summary if s["forecaster"] == "base_rate"), None)
     for s in summary:
-        s["bss_vs_base_rate"] = fmath.brier_skill_score(s["brier"], base["brier"]) if base and base["brier"] else None
+        s["bss_vs_base_rate"] = (
+            fmath.brier_skill_score(s["brier"], base["brier"]) if base and base["brier"] else None
+        )
     return {"forecaster": forecaster, "calibration": cal, "forecasters": forecasters, "summary": summary}
 
 
@@ -321,9 +400,15 @@ def add_forecast(qid: str, body: ForecastIn) -> dict[str, Any]:
     if body.forecaster not in ("user",):
         raise HTTPException(400, "desde la UI solo se registran pronósticos del usuario")
     with d.tx() as conn:
-        conn.execute("INSERT INTO forecast(id, question_id, forecaster, probability, rationale, made_at) VALUES (?,?,?,?,?,?)", (new_id(), qid, body.forecaster, body.probability, body.rationale, now_iso()))
+        conn.execute(
+            "INSERT INTO forecast(id, question_id, forecaster, probability, rationale, made_at) VALUES (?,?,?,?,?,?)",
+            (new_id(), qid, body.forecaster, body.probability, body.rationale, now_iso()),
+        )
     # protocolo: el sistema solo se revela después de registrar el del usuario
-    system = d.one("SELECT probability FROM forecast WHERE question_id = ? AND forecaster IN ('atlas_final','base_rate') ORDER BY forecaster = 'atlas_final' DESC, made_at DESC LIMIT 1", (qid,))
+    system = d.one(
+        "SELECT probability FROM forecast WHERE question_id = ? AND forecaster IN ('atlas_final','base_rate') ORDER BY forecaster = 'atlas_final' DESC, made_at DESC LIMIT 1",
+        (qid,),
+    )
     return {"ok": True, "system_probability": system["probability"] if system else None}
 
 
@@ -340,16 +425,24 @@ def resolve_question(qid: str, body: ResolveIn) -> dict[str, Any]:
         raise HTTPException(404, "pregunta no encontrada")
     scores = {}
     with d.tx() as conn:
-        conn.execute("UPDATE forecast_question SET status = 'resolved', resolved_at = ?, outcome = ? WHERE id = ?", (now_iso(), dumps({"value": body.outcome, "note": body.note}), qid))
+        conn.execute(
+            "UPDATE forecast_question SET status = 'resolved', resolved_at = ?, outcome = ? WHERE id = ?",
+            (now_iso(), dumps({"value": body.outcome, "note": body.note}), qid),
+        )
         # último pronóstico de cada pronosticador antes del cierre
-        rows = conn.execute("SELECT forecaster, probability FROM forecast WHERE question_id = ? ORDER BY made_at", (qid,)).fetchall()
+        rows = conn.execute(
+            "SELECT forecaster, probability FROM forecast WHERE question_id = ? ORDER BY made_at", (qid,)
+        ).fetchall()
         last: dict[str, float] = {}
         for r in rows:
             last[r["forecaster"]] = r["probability"]
         for f, p in last.items():
             b = fmath.brier(p, body.outcome)
             ls = fmath.log_score(p, body.outcome)
-            conn.execute("INSERT OR REPLACE INTO forecast_score(question_id, forecaster, brier, log_score) VALUES (?,?,?,?)", (qid, f, round(b, 4), round(ls, 4)))
+            conn.execute(
+                "INSERT OR REPLACE INTO forecast_score(question_id, forecaster, brier, log_score) VALUES (?,?,?,?)",
+                (qid, f, round(b, 4), round(ls, 4)),
+            )
             scores[f] = {"brier": round(b, 4), "log_score": round(ls, 4), "p": p}
     return {"ok": True, "scores": scores}
 
@@ -365,8 +458,14 @@ def link_market(qid: str, body: LinkMarketIn) -> dict[str, Any]:
     if not m:
         raise HTTPException(404, "mercado no encontrado")
     with d.tx() as conn:
-        conn.execute("UPDATE forecast_question SET market_links = ? WHERE id = ?", (dumps([{"id": m["id"], "venue": m["venue"], "url": m["url"]}]), qid))
-        conn.execute("INSERT INTO forecast(id, question_id, forecaster, probability, rationale, made_at) VALUES (?,?,?,?,?,?)", (new_id(), qid, f"market:{m['venue']}", m["probability"], m["question"], now_iso()))
+        conn.execute(
+            "UPDATE forecast_question SET market_links = ? WHERE id = ?",
+            (dumps([{"id": m["id"], "venue": m["venue"], "url": m["url"]}]), qid),
+        )
+        conn.execute(
+            "INSERT INTO forecast(id, question_id, forecaster, probability, rationale, made_at) VALUES (?,?,?,?,?,?)",
+            (new_id(), qid, f"market:{m['venue']}", m["probability"], m["question"], now_iso()),
+        )
         conn.execute("UPDATE prediction_market SET followed = 1 WHERE id = ?", (m["id"],))
     return {"ok": True}
 
@@ -392,7 +491,10 @@ def _note_out(d, r) -> dict[str, Any]:
 def list_notes(q: str | None = None) -> dict[str, Any]:
     d = db()
     if q:
-        rows = d.all("SELECT * FROM note WHERE title LIKE ? OR body_text LIKE ? ORDER BY updated_at DESC", (f"%{q}%", f"%{q}%"))
+        rows = d.all(
+            "SELECT * FROM note WHERE title LIKE ? OR body_text LIKE ? ORDER BY updated_at DESC",
+            (f"%{q}%", f"%{q}%"),
+        )
     else:
         rows = d.all("SELECT * FROM note ORDER BY updated_at DESC LIMIT 200")
     return {"notes": [_note_out(d, r) for r in rows]}
@@ -405,7 +507,18 @@ def create_note(body: NoteIn) -> dict[str, Any]:
     links = sorted(set(_LINK_RE.findall(body.body_text)))
     ts = now_iso()
     with d.tx() as conn:
-        conn.execute("INSERT INTO note(id, title, body_text, links, course, created_at, updated_at) VALUES (?,?,?,?,?,?,?)", (nid, body.title or (body.body_text[:60] or "Sin título"), body.body_text, dumps(links), body.course, ts, ts))
+        conn.execute(
+            "INSERT INTO note(id, title, body_text, links, course, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+            (
+                nid,
+                body.title or (body.body_text[:60] or "Sin título"),
+                body.body_text,
+                dumps(links),
+                body.course,
+                ts,
+                ts,
+            ),
+        )
     return {"id": nid}
 
 
@@ -416,10 +529,17 @@ def get_note(note_id: str) -> dict[str, Any]:
     if not r:
         raise HTTPException(404, "nota no encontrada")
     n = _note_out(d, r)
-    back = [_note_out(d, x) for x in d.all("SELECT * FROM note WHERE id != ? AND links LIKE ?", (note_id, f'%"{n["title"]}"%'))]
+    back = [
+        _note_out(d, x)
+        for x in d.all("SELECT * FROM note WHERE id != ? AND links LIKE ?", (note_id, f'%"{n["title"]}"%'))
+    ]
     n["backlinks"] = back
     marks = ",".join("?" for _ in n["links"])
-    n["linked_entities"] = [dict(x) for x in d.all(f"SELECT id, kind, name FROM entity WHERE name IN ({marks})", n["links"])] if n["links"] else []
+    n["linked_entities"] = (
+        [dict(x) for x in d.all(f"SELECT id, kind, name FROM entity WHERE name IN ({marks})", n["links"])]
+        if n["links"]
+        else []
+    )
     return n
 
 
@@ -427,7 +547,17 @@ def get_note(note_id: str) -> dict[str, Any]:
 def update_note(note_id: str, body: NoteIn) -> dict[str, Any]:
     d = db()
     links = sorted(set(_LINK_RE.findall(body.body_text)))
-    d.update("note", note_id, {"title": body.title, "body_text": body.body_text, "links": dumps(links), "course": body.course, "updated_at": now_iso()})
+    d.update(
+        "note",
+        note_id,
+        {
+            "title": body.title,
+            "body_text": body.body_text,
+            "links": dumps(links),
+            "course": body.course,
+            "updated_at": now_iso(),
+        },
+    )
     return {"ok": True}
 
 
@@ -457,7 +587,11 @@ class CardIn(BaseModel):
 @router.get("/cards")
 def list_cards(due_only: bool = False) -> dict[str, Any]:
     d = db()
-    sql = "SELECT * FROM review_card" + (" WHERE due_at <= ?" if due_only else "") + " ORDER BY due_at LIMIT 200"
+    sql = (
+        "SELECT * FROM review_card"
+        + (" WHERE due_at <= ?" if due_only else "")
+        + " ORDER BY due_at LIMIT 200"
+    )
     rows = d.all(sql, (now_iso(),) if due_only else ())
     out = []
     for r in rows:
@@ -465,7 +599,10 @@ def list_cards(due_only: bool = False) -> dict[str, Any]:
         c["fsrs_state"] = loads(c["fsrs_state"], {})
         c["source_ref"] = loads(c["source_ref"], {})
         out.append(c)
-    return {"cards": out, "due": d.scalar("SELECT COUNT(*) FROM review_card WHERE due_at <= ?", (now_iso(),), 0)}
+    return {
+        "cards": out,
+        "due": d.scalar("SELECT COUNT(*) FROM review_card WHERE due_at <= ?", (now_iso(),), 0),
+    }
 
 
 @router.post("/cards")
@@ -473,7 +610,18 @@ def create_card(body: CardIn) -> dict[str, Any]:
     d = db()
     cid = new_id()
     with d.tx() as conn:
-        conn.execute("INSERT INTO review_card(id, front, back, source_ref, fsrs_state, due_at, created_at) VALUES (?,?,?,?,?,?,?)", (cid, body.front, body.back, dumps(body.source_ref), dumps({"interval": 0, "ease": 2.5, "reps": 0, "lapses": 0}), now_iso(), now_iso()))
+        conn.execute(
+            "INSERT INTO review_card(id, front, back, source_ref, fsrs_state, due_at, created_at) VALUES (?,?,?,?,?,?,?)",
+            (
+                cid,
+                body.front,
+                body.back,
+                dumps(body.source_ref),
+                dumps({"interval": 0, "ease": 2.5, "reps": 0, "lapses": 0}),
+                now_iso(),
+                now_iso(),
+            ),
+        )
     return {"id": cid}
 
 
@@ -510,8 +658,12 @@ def review_card(card_id: str, body: ReviewIn) -> dict[str, Any]:
     if not r:
         raise HTTPException(404, "tarjeta no encontrada")
     st = schedule(loads(r["fsrs_state"], {}), body.rating)
-    due = datetime.now(UTC) + timedelta(days=st["interval"] if st["interval"] > 0 else 0, minutes=10 if st["interval"] == 0 else 0)
-    d.update("review_card", card_id, {"fsrs_state": dumps(st), "due_at": due.replace(microsecond=0).isoformat()})
+    due = datetime.now(UTC) + timedelta(
+        days=st["interval"] if st["interval"] > 0 else 0, minutes=10 if st["interval"] == 0 else 0
+    )
+    d.update(
+        "review_card", card_id, {"fsrs_state": dumps(st), "due_at": due.replace(microsecond=0).isoformat()}
+    )
     return {"ok": True, "state": st, "due_at": due.isoformat()}
 
 

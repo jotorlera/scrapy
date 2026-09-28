@@ -23,7 +23,9 @@ def sigmoid(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-x))
 
 
-def aggregate_ensemble(probs: list[float], weights: list[float] | None = None, a: float = 1.5) -> dict[str, float]:
+def aggregate_ensemble(
+    probs: list[float], weights: list[float] | None = None, a: float = 1.5
+) -> dict[str, float]:
     """Media ponderada de log-odds + extremización. Devuelve raw y extremized."""
     if not probs:
         raise ValueError("sin pronósticos")
@@ -69,7 +71,14 @@ def calibration(pairs: list[tuple[float, int]], bins: int = 10) -> dict[str, Any
     """pairs: (probabilidad, resultado 0/1). Curva por deciles + Murphy (fiabilidad, resolución, incertidumbre)."""
     n = len(pairs)
     if n == 0:
-        return {"n": 0, "bins": [], "brier": None, "reliability": None, "resolution": None, "uncertainty": None}
+        return {
+            "n": 0,
+            "bins": [],
+            "brier": None,
+            "reliability": None,
+            "resolution": None,
+            "uncertainty": None,
+        }
     base = sum(o for _, o in pairs) / n
     buckets: list[list[tuple[float, int]]] = [[] for _ in range(bins)]
     for p, o in pairs:
@@ -89,7 +98,16 @@ def calibration(pairs: list[tuple[float, int]], bins: int = 10) -> dict[str, Any
         ci = wilson(k, len(b))
         reliability += len(b) * (mean_p - freq) ** 2
         resolution += len(b) * (freq - base) ** 2
-        out_bins.append({"lo": lo, "hi": hi, "n": len(b), "mean_p": round(mean_p, 3), "freq": round(freq, 3), "ci": [round(ci[0], 3), round(ci[1], 3)]})
+        out_bins.append(
+            {
+                "lo": lo,
+                "hi": hi,
+                "n": len(b),
+                "mean_p": round(mean_p, 3),
+                "freq": round(freq, 3),
+                "ci": [round(ci[0], 3), round(ci[1], 3)],
+            }
+        )
     brier_mean = sum(brier(p, o) for p, o in pairs) / n
     return {
         "n": n,

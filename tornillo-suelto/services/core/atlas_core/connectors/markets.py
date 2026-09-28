@@ -19,6 +19,7 @@ from ..util import to_iso
 def _ts(ts: float | int) -> str | None:
     return to_iso(datetime.fromtimestamp(ts, tz=UTC))
 
+
 CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
 
 # símbolo, etiqueta, grupo
@@ -92,8 +93,18 @@ async def refresh_markets(db: Database, client: httpx.AsyncClient) -> dict[str, 
                        ON CONFLICT(symbol) DO UPDATE SET price=excluded.price, change_pct=excluded.change_pct,
                        currency=excluded.currency, observed_at=excluded.observed_at, fetched_at=excluded.fetched_at,
                        history=excluded.history, error=NULL""",
-                    (symbol, label, group, q["price"], q["change_pct"], q["currency"], q["observed_at"], ts,
-                     "Yahoo Finance (chart API)", json.dumps(q["history"])),
+                    (
+                        symbol,
+                        label,
+                        group,
+                        q["price"],
+                        q["change_pct"],
+                        q["currency"],
+                        q["observed_at"],
+                        ts,
+                        "Yahoo Finance (chart API)",
+                        json.dumps(q["history"]),
+                    ),
                 )
             ok += 1
         except (httpx.HTTPError, KeyError, IndexError, ValueError, TypeError) as e:

@@ -30,7 +30,13 @@ async def main() -> None:
         slug = src["slug"]
         if src.get("t") == "data_api":
             return
-        source = {"id": slug, "slug": slug, "domain": src.get("domain"), "type": src.get("t"), "feeds": catalog.get(slug, [])}
+        source = {
+            "id": slug,
+            "slug": slug,
+            "domain": src.get("domain"),
+            "type": src.get("t"),
+            "feeds": catalog.get(slug, []),
+        }
         async with sem, make_client(timeout=20.0) as client:
             if source["feeds"]:
                 res = await conn.fetch(source, client)
@@ -44,7 +50,12 @@ async def main() -> None:
                 if res.ok and res.items:
                     results[slug] = {"feeds": discovered[:1], "items": len(res.items), "how": "discovered"}
                     return
-            results[slug] = {"feeds": [], "items": 0, "how": "none", "error": getattr(res, "error", None) if source["feeds"] else "no feed found"}
+            results[slug] = {
+                "feeds": [],
+                "items": 0,
+                "how": "none",
+                "error": getattr(res, "error", None) if source["feeds"] else "no feed found",
+            }
 
     await asyncio.gather(*(check(s) for s in seeds))
     ok = {k: v for k, v in results.items() if v["items"]}
@@ -56,7 +67,9 @@ async def main() -> None:
         print(f"  ✗ {k:24s} {v.get('error')}")
     out = {k: v["feeds"][0] for k, v in sorted(ok.items())}
     (ROOT / "data").mkdir(exist_ok=True)
-    (ROOT / "data" / "feeds_verified.yaml").write_text(yaml.safe_dump(out, allow_unicode=True, sort_keys=True), encoding="utf-8")
+    (ROOT / "data" / "feeds_verified.yaml").write_text(
+        yaml.safe_dump(out, allow_unicode=True, sort_keys=True), encoding="utf-8"
+    )
 
 
 if __name__ == "__main__":

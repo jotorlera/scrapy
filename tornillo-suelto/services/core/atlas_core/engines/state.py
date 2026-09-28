@@ -20,24 +20,93 @@ SEED_VARIABLES = [
     ("MONEY", "fx_vs_usd", "%/7d", {"type": "abs", "value": 2.0}, "Yahoo Finance (cinta)"),
     ("MONEY", "10y_yield", "pb", {"type": "abs", "value": 25}, "Mercado"),
     ("POWER", "head_of_government", "categorical", {"type": "categorical"}, "Afirmación confirmada"),
-    ("RULES", "major_law_adopted_30d", "count", {"type": "categorical"}, "Boletín oficial / afirmación confirmada"),
+    (
+        "RULES",
+        "major_law_adopted_30d",
+        "count",
+        {"type": "categorical"},
+        "Boletín oficial / afirmación confirmada",
+    ),
     ("RULES", "court_ruling_major_30d", "count", {"type": "categorical"}, "Tribunal / afirmación confirmada"),
     ("FORCE", "ceasefire_status", "categorical", {"type": "categorical"}, "Afirmación confirmada"),
     ("FORCE", "major_attack_30d", "count", {"type": "categorical"}, "Afirmación confirmada"),
     ("EXTERNAL", "sanctions_active_count", "count", {"type": "categorical"}, "Listas oficiales"),
-    ("LEGITIMACY", "protest_events_30d", "count", {"type": "zscore", "window_days": 90, "value": 2.0}, "ACLED (requiere clave)"),
+    (
+        "LEGITIMACY",
+        "protest_events_30d",
+        "count",
+        {"type": "zscore", "window_days": 90, "value": 2.0},
+        "ACLED (requiere clave)",
+    ),
 ]
 
-FX_SYMBOL_TO_COUNTRY = {"USDJPY=X": "JP", "USDCNY=X": "CN", "USDTRY=X": "TR", "USDBRL=X": "BR", "USDMXN=X": "MX", "EURUSD=X": "EU"}
+FX_SYMBOL_TO_COUNTRY = {
+    "USDJPY=X": "JP",
+    "USDCNY=X": "CN",
+    "USDTRY=X": "TR",
+    "USDBRL=X": "BR",
+    "USDMXN=X": "MX",
+    "EURUSD=X": "EU",
+}
 
 CATEGORICAL_RULES: list[tuple[str, str, str, re.Pattern]] = [
-    ("POWER", "head_of_government", "cambio o crisis en la jefatura de Gobierno", re.compile(r"\b(dimite|dimisión|renuncia|resigns|resignation|destituid|ousted|impeach|jura el cargo|sworn in|investid|gana las elecciones|wins election|elected|démission|zurückgetreten)\b", re.I)),
-    ("RULES", "major_law_adopted_30d", "norma adoptada o en vigor", re.compile(r"\b(aprueba la ley|aprobada la ley|entra en vigor|promulga|ratifica|signed into law|adopted|passes law|enacted|verabschiedet|adopté)\b", re.I)),
-    ("RULES", "court_ruling_major_30d", "sentencia relevante", re.compile(r"\b(sentencia|condena|condenado|sentenced|convicted|ruling|falla|anula|strikes down|absuelto|acquitted)\b", re.I)),
-    ("FORCE", "ceasefire_status", "cambio en alto el fuego", re.compile(r"\b(alto el fuego|ceasefire|tregua|truce|cessez-le-feu|waffenruhe)\b", re.I)),
-    ("FORCE", "major_attack_30d", "ataque de gran escala", re.compile(r"\b(bombardeo|airstrike|misiles|missile strike|ofensiva|offensive|atentado|attack kills|killed at least|masacre|massacre)\b", re.I)),
-    ("EXTERNAL", "sanctions_active_count", "sanciones o aranceles", re.compile(r"\b(sanciona|sanciones|sanctions|aranceles|tariffs|embargo)\b", re.I)),
-    ("MONEY", "policy_rate", "decisión de tipos", re.compile(r"\b(sube los tipos|baja los tipos|rate hike|rate cut|raises rates|cuts rates|mantiene los tipos|holds rates|subida de tipos|bajada de tipos|recorta los tipos)\b", re.I)),
+    (
+        "POWER",
+        "head_of_government",
+        "cambio o crisis en la jefatura de Gobierno",
+        re.compile(
+            r"\b(dimite|dimisión|renuncia|resigns|resignation|destituid|ousted|impeach|jura el cargo|sworn in|investid|gana las elecciones|wins election|elected|démission|zurückgetreten)\b",
+            re.I,
+        ),
+    ),
+    (
+        "RULES",
+        "major_law_adopted_30d",
+        "norma adoptada o en vigor",
+        re.compile(
+            r"\b(aprueba la ley|aprobada la ley|entra en vigor|promulga|ratifica|signed into law|adopted|passes law|enacted|verabschiedet|adopté)\b",
+            re.I,
+        ),
+    ),
+    (
+        "RULES",
+        "court_ruling_major_30d",
+        "sentencia relevante",
+        re.compile(
+            r"\b(sentencia|condena|condenado|sentenced|convicted|ruling|falla|anula|strikes down|absuelto|acquitted)\b",
+            re.I,
+        ),
+    ),
+    (
+        "FORCE",
+        "ceasefire_status",
+        "cambio en alto el fuego",
+        re.compile(r"\b(alto el fuego|ceasefire|tregua|truce|cessez-le-feu|waffenruhe)\b", re.I),
+    ),
+    (
+        "FORCE",
+        "major_attack_30d",
+        "ataque de gran escala",
+        re.compile(
+            r"\b(bombardeo|airstrike|misiles|missile strike|ofensiva|offensive|atentado|attack kills|killed at least|masacre|massacre)\b",
+            re.I,
+        ),
+    ),
+    (
+        "EXTERNAL",
+        "sanctions_active_count",
+        "sanciones o aranceles",
+        re.compile(r"\b(sanciona|sanciones|sanctions|aranceles|tariffs|embargo)\b", re.I),
+    ),
+    (
+        "MONEY",
+        "policy_rate",
+        "decisión de tipos",
+        re.compile(
+            r"\b(sube los tipos|baja los tipos|rate hike|rate cut|raises rates|cuts rates|mantiene los tipos|holds rates|subida de tipos|bajada de tipos|recorta los tipos)\b",
+            re.I,
+        ),
+    ),
 ]
 
 
@@ -51,7 +120,9 @@ def seed_state_variables(db: Database) -> int:
             for dim, key, unit, threshold, hint in SEED_VARIABLES:
                 if scope == "world" and key not in ("fx_vs_usd", "major_attack_30d"):
                     continue
-                cur = conn.execute("SELECT 1 FROM state_variable WHERE scope = ? AND key = ?", (scope, key)).fetchone()
+                cur = conn.execute(
+                    "SELECT 1 FROM state_variable WHERE scope = ? AND key = ?", (scope, key)
+                ).fetchone()
                 if cur:
                     continue
                 conn.execute(
@@ -100,7 +171,9 @@ def deltas_from_markets(db: Database) -> int:
         vid = _variable_id(db, scope, "fx_vs_usd")
         if not vid:
             continue
-        threshold = loads(db.one("SELECT threshold FROM state_variable WHERE id = ?", (vid,))["threshold"], {})
+        threshold = loads(
+            db.one("SELECT threshold FROM state_variable WHERE id = ?", (vid,))["threshold"], {}
+        )
         with db.tx() as conn:
             conn.execute(
                 """INSERT OR REPLACE INTO state_observation(variable_id, observed_at, value_num, source_note)
@@ -109,20 +182,35 @@ def deltas_from_markets(db: Database) -> int:
             )
             if abs(pct) >= float(threshold.get("value", 2.0)):
                 exists = conn.execute(
-                    "SELECT 1 FROM state_delta WHERE variable_id = ? AND detected_at >= date('now','-6 days')", (vid,)
+                    "SELECT 1 FROM state_delta WHERE variable_id = ? AND detected_at >= date('now','-6 days')",
+                    (vid,),
                 ).fetchone()
                 if not exists:
-                    direction = "se deprecia" if (pct > 0 and sym != "EURUSD=X") or (pct < 0 and sym == "EURUSD=X") else "se aprecia"
+                    direction = (
+                        "se deprecia"
+                        if (pct > 0 and sym != "EURUSD=X") or (pct < 0 and sym == "EURUSD=X")
+                        else "se aprecia"
+                    )
                     conn.execute(
                         "INSERT INTO state_delta(id, variable_id, event_id, detected_at, magnitude, description) VALUES (?,?,?,?,?,?)",
-                        (new_id(), vid, None, ts, round(pct, 2), f"{sym}: {pct:+.1f}% en 7 sesiones ({direction} frente al USD). Fuente: Yahoo Finance"),
+                        (
+                            new_id(),
+                            vid,
+                            None,
+                            ts,
+                            round(pct, 2),
+                            f"{sym}: {pct:+.1f}% en 7 sesiones ({direction} frente al USD). Fuente: Yahoo Finance",
+                        ),
                     )
                     n += 1
     return n
 
 
 def deltas_from_event(db: Database, event_id: str) -> int:
-    ev = db.one("SELECT id, title_neutral, countries, materiality_breakdown, lead_document_id FROM event WHERE id = ?", (event_id,))
+    ev = db.one(
+        "SELECT id, title_neutral, countries, materiality_breakdown, lead_document_id FROM event WHERE id = ?",
+        (event_id,),
+    )
     if not ev:
         return 0
     br = loads(ev["materiality_breakdown"], {}) or {}
@@ -151,12 +239,22 @@ def deltas_from_event(db: Database, event_id: str) -> int:
             if not vid:
                 continue
             if True:
-                dup = conn.execute("SELECT 1 FROM state_delta WHERE variable_id = ? AND event_id = ?", (vid, event_id)).fetchone()
+                dup = conn.execute(
+                    "SELECT 1 FROM state_delta WHERE variable_id = ? AND event_id = ?", (vid, event_id)
+                ).fetchone()
                 if dup:
                     continue
                 conn.execute(
                     "INSERT INTO state_delta(id, variable_id, event_id, detected_at, magnitude, description, source_doc_id) VALUES (?,?,?,?,?,?,?)",
-                    (new_id(), vid, event_id, ts, 1.0, f"{scope} · {dim} · {label}: {ev['title_neutral'][:140]}", lead["id"] if lead else None),
+                    (
+                        new_id(),
+                        vid,
+                        event_id,
+                        ts,
+                        1.0,
+                        f"{scope} · {dim} · {label}: {ev['title_neutral'][:140]}",
+                        lead["id"] if lead else None,
+                    ),
                 )
                 n += 1
     return n

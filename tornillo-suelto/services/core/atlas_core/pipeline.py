@@ -47,11 +47,16 @@ def _job_start(db: Database, job: str) -> int:
 
 def _job_end(db: Database, job_id: int, ok: bool, stats: dict[str, Any], error: str | None = None) -> None:
     with db.tx() as conn:
-        conn.execute("UPDATE job_run SET finished_at = ?, ok = ?, stats = ?, error = ? WHERE id = ?", (now_iso(), 1 if ok else 0, dumps(stats), error, job_id))
+        conn.execute(
+            "UPDATE job_run SET finished_at = ?, ok = ?, stats = ?, error = ? WHERE id = ?",
+            (now_iso(), 1 if ok else 0, dumps(stats), error, job_id),
+        )
 
 
 def due_sources(db: Database, force: bool = False, limit: int | None = None) -> list[dict[str, Any]]:
-    rows = db.all("SELECT * FROM source WHERE active = 1 AND feeds != '[]' ORDER BY tier ASC, last_polled_at ASC")
+    rows = db.all(
+        "SELECT * FROM source WHERE active = 1 AND feeds != '[]' ORDER BY tier ASC, last_polled_at ASC"
+    )
     out = []
     now = parse_iso(now_iso())
     for r in rows:
@@ -70,7 +75,15 @@ async def fetch_sources(db: Database, sources: list[dict[str, Any]]) -> dict[str
     """Descarga feeds en paralelo, registra salud e inserta documentos nuevos."""
     conn_rss = RSSConnector()
     sem = asyncio.Semaphore(settings.atlas_ingest_concurrency)
-    stats = {"sources": len(sources), "ok": 0, "failed": 0, "not_modified": 0, "new_docs": 0, "dup_docs": 0, "errors": []}
+    stats = {
+        "sources": len(sources),
+        "ok": 0,
+        "failed": 0,
+        "not_modified": 0,
+        "new_docs": 0,
+        "dup_docs": 0,
+        "errors": [],
+    }
 
     async def one(src: dict[str, Any], client) -> None:
         async with sem:
@@ -98,7 +111,11 @@ async def fetch_sources(db: Database, sources: list[dict[str, Any]]) -> dict[str
                 stats["errors"].append(f"{src['slug']}: {res.error[:120]}")
             return
         stats["ok"] += 1
-        cap = MAX_ITEMS_BULLETIN if src.get("type") in ("institution", "statistical_office", "court") else MAX_ITEMS_PER_SOURCE_PER_RUN
+        cap = (
+            MAX_ITEMS_BULLETIN
+            if src.get("type") in ("institution", "statistical_office", "court")
+            else MAX_ITEMS_PER_SOURCE_PER_RUN
+        )
         new, dup = insert_documents(db, src, [conn_rss.normalize(src, it) for it in res.items[:cap]])
         stats["new_docs"] += new
         stats["dup_docs"] += dup
@@ -127,20 +144,43 @@ def insert_documents(db: Database, source: dict[str, Any], docs: list) -> tuple[
                 """INSERT INTO document(id, source_id, kind, url, canonical_url, title, lede, text, lang, authors, published_at,
                    fetched_at, content_hash, extraction_method, paywalled, meta)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (doc_id, d.source_id, d.kind, d.url, d.canonical_url, d.title, d.lede, d.text, d.lang, dumps(d.authors),
-                 d.published_at or ts, ts, d.content_hash, d.extraction_method, 1 if d.paywalled else 0, dumps(d.meta)),
+                (
+                    doc_id,
+                    d.source_id,
+                    d.kind,
+                    d.url,
+                    d.canonical_url,
+                    d.title,
+                    d.lede,
+                    d.text,
+                    d.lang,
+                    dumps(d.authors),
+                    d.published_at or ts,
+                    ts,
+                    d.content_hash,
+                    d.extraction_method,
+                    1 if d.paywalled else 0,
+                    dumps(d.meta),
+                ),
             )
-            conn.execute("INSERT INTO document_fts(doc_id, title, lede, text) VALUES (?,?,?,?)", (doc_id, d.title, d.lede, d.text[:5000]))
+            conn.execute(
+                "INSERT INTO document_fts(doc_id, title, lede, text) VALUES (?,?,?,?)",
+                (doc_id, d.title, d.lede, d.text[:5000]),
+            )
             new += 1
     return new, dup
 
 
 def _entity_cache(db: Database) -> dict[str, str]:
-    rows = db.all("SELECT id, json_extract(attributes, '$.key') AS k FROM entity WHERE json_extract(attributes, '$.key') IS NOT NULL")
+    rows = db.all(
+        "SELECT id, json_extract(attributes, '$.key') AS k FROM entity WHERE json_extract(attributes, '$.key') IS NOT NULL"
+    )
     return {r["k"]: r["id"] for r in rows if r["k"]}
 
 
-def process_new_documents(db: Database, max_docs: int = 1500, use_llm: bool | None = None, max_batches: int = 6) -> dict[str, Any]:
+def process_new_documents(
+    db: Database, max_docs: int = 1500, use_llm: bool | None = None, max_batches: int = 6
+) -> dict[str, Any]:
     """Procesa por lotes todos los documentos sin evento y consolida eventos duplicados al final."""
     total: dict[str, Any] = {}
     for _ in range(max_batches):
@@ -164,7 +204,10 @@ def _process_batch(db: Database, max_docs: int, use_llm: bool | None) -> dict[st
     """Embeddings, entidades, clustering y afirmaciones para un lote de documentos sin evento."""
     emb = get_embedder()
     # IDF sobre el corpus reciente: las palabras raras (nombres propios) pesan; el boilerplate, no
-    corpus = [f"{r['title']} {r['lede'] or ''}" for r in db.all("SELECT title, lede FROM document ORDER BY fetched_at DESC LIMIT 20000")]
+    corpus = [
+        f"{r['title']} {r['lede'] or ''}"
+        for r in db.all("SELECT title, lede FROM document ORDER BY fetched_at DESC LIMIT 20000")
+    ]
     set_idf(IDF.from_texts(corpus))
     idx = ClusterIndex(db)
     ent_cache = _entity_cache(db)
@@ -173,7 +216,15 @@ def _process_batch(db: Database, max_docs: int, use_llm: bool | None) -> dict[st
            WHERE d.event_id IS NULL ORDER BY d.published_at DESC LIMIT ?""",
         (max_docs,),
     )
-    stats = {"docs": len(rows), "new_events": 0, "joined": 0, "claims_new": 0, "claims_merged": 0, "claims_dropped": 0, "llm_docs": 0}
+    stats = {
+        "docs": len(rows),
+        "new_events": 0,
+        "joined": 0,
+        "claims_new": 0,
+        "claims_merged": 0,
+        "claims_dropped": 0,
+        "llm_docs": 0,
+    }
     touched: set[str] = set()
     llm = None
     if use_llm is None:
@@ -185,7 +236,9 @@ def _process_batch(db: Database, max_docs: int, use_llm: bool | None) -> dict[st
     for r in rows:
         doc = dict(r)
         source = {"id": doc["source_id"], "name": doc["sname"], "tier": doc["tier"], "type": doc["stype"]}
-        text_for_embedding = f"{doc['title']}. {doc['title']}. {doc['lede'] or ''} {(doc['text'] or '')[:800]}"
+        text_for_embedding = (
+            f"{doc['title']}. {doc['title']}. {doc['lede'] or ''} {(doc['text'] or '')[:800]}"
+        )
         mentions = find_mentions(f"{doc['lede'] or ''}\n{(doc['text'] or '')[:3000]}", doc["title"])
         countries = countries_from_mentions(mentions)
         keys = principal_keys(mentions)
@@ -193,14 +246,28 @@ def _process_batch(db: Database, max_docs: int, use_llm: bool | None) -> dict[st
         scountry = doc.get("scountry")
         national_source = bool(scountry) and scountry not in ("EU", "UN")
         # sin país explícito, un medio nacional habla de su país (tier 2-3, prensa)
-        if not countries and national_source and doc["stype"] in ("newspaper", "broadcaster", "digital_native", "wire", "magazine"):
+        if (
+            not countries
+            and national_source
+            and doc["stype"] in ("newspaper", "broadcaster", "digital_native", "wire", "magazine")
+        ):
             countries = [scountry]
         # una institución nacional (Casa Blanca, BOE, Fed) habla ante todo de su país: va primero
         if national_source and doc["stype"] in ("institution", "central_bank", "court", "statistical_office"):
             countries = [scountry] + [c for c in countries if c != scountry]
         vec = emb.embed(text_for_embedding, extra_tokens=keys + [f"topic:{t}" for t in topics])
         domain = classify_domain(f"{doc['title']} {doc['lede'] or ''}")
-        event_id, sim, created = idx.assign(doc["id"], vec, keys, countries, doc["published_at"], domain, doc["title"], topics, source_id=doc["source_id"])
+        event_id, sim, created = idx.assign(
+            doc["id"],
+            vec,
+            keys,
+            countries,
+            doc["published_at"],
+            domain,
+            doc["title"],
+            topics,
+            source_id=doc["source_id"],
+        )
         stats["new_events" if created else "joined"] += 1
         touched.add(event_id)
         with db.tx() as conn:
@@ -208,7 +275,10 @@ def _process_batch(db: Database, max_docs: int, use_llm: bool | None) -> dict[st
                 "UPDATE document SET embedding = ?, embedding_model = ?, countries = ?, event_id = ? WHERE id = ?",
                 (vec_to_blob(vec), emb.name, dumps(countries), event_id, doc["id"]),
             )
-            conn.execute("INSERT OR IGNORE INTO event_document(event_id, document_id, similarity) VALUES (?,?,?)", (event_id, doc["id"], round(sim, 3)))
+            conn.execute(
+                "INSERT OR IGNORE INTO event_document(event_id, document_id, similarity) VALUES (?,?,?)",
+                (event_id, doc["id"], round(sim, 3)),
+            )
             for m in mentions[:12]:
                 eid = ent_cache.get(m.key)
                 if eid is None and m.kind == "topic":
@@ -219,7 +289,10 @@ def _process_batch(db: Database, max_docs: int, use_llm: bool | None) -> dict[st
                     )
                     ent_cache[m.key] = eid
                 if eid:
-                    conn.execute("INSERT OR IGNORE INTO document_entity(document_id, entity_id, salience) VALUES (?,?,?)", (doc["id"], eid, min(1.0, m.count / 10.0)))
+                    conn.execute(
+                        "INSERT OR IGNORE INTO document_entity(document_id, entity_id, salience) VALUES (?,?,?)",
+                        (doc["id"], eid, min(1.0, m.count / 10.0)),
+                    )
         # afirmaciones
         cands = None
         if llm is not None and (doc["tier"] or 4) <= 3:
@@ -274,7 +347,13 @@ def recompute_events(db: Database, hours: int = 72) -> dict[str, int]:
     """Consolida duplicados y recalcula cobertura y materialidad de los eventos activos (la novedad decae,
     las cuotas de producción cambian)."""
     cons = consolidate_events(db, hours=min(hours, 48))
-    ids = [r["id"] for r in db.all("SELECT id FROM event WHERE status != 'merged' AND last_update_at >= datetime('now', ?)", (f"-{hours} hours",))]
+    ids = [
+        r["id"]
+        for r in db.all(
+            "SELECT id FROM event WHERE status != 'merged' AND last_update_at >= datetime('now', ?)",
+            (f"-{hours} hours",),
+        )
+    ]
     shares = baseline_shares(db)
     for eid in ids:
         compute_coverage(db, eid, shares)
@@ -282,13 +361,16 @@ def recompute_events(db: Database, hours: int = 72) -> dict[str, int]:
     return {"events": len(ids), "consolidated": cons.get("merged", 0)}
 
 
-async def run_ingest(db: Database, force: bool = False, limit_sources: int | None = None, use_llm: bool | None = None) -> dict[str, Any]:
+async def run_ingest(
+    db: Database, force: bool = False, limit_sources: int | None = None, use_llm: bool | None = None
+) -> dict[str, Any]:
     job = _job_start(db, "ingest")
     t0 = time.monotonic()
     try:
         sources = due_sources(db, force=force, limit=limit_sources)
         fetch_stats = await fetch_sources(db, sources)
-        proc_stats = process_new_documents(db, use_llm=use_llm)
+        # CPU-bound: fuera del bucle de eventos para que la API siga respondiendo durante el procesado
+        proc_stats = await asyncio.to_thread(process_new_documents, db, use_llm=use_llm)
         stats = {"fetch": fetch_stats, "process": proc_stats, "seconds": round(time.monotonic() - t0, 1)}
         _job_end(db, job, True, stats)
         return stats

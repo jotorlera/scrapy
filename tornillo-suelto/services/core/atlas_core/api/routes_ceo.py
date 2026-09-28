@@ -30,7 +30,11 @@ def mando() -> dict[str, Any]:
         x = dict(b)
         for f in ("sectors", "jurisdictions", "markets", "currencies", "regulations", "keywords"):
             x[f] = loads(x[f], [])
-        x["alerts_7d"] = d.scalar("SELECT COUNT(*) FROM exposure_alert WHERE business_id = ? AND dismissed = 0 AND created_at >= datetime('now','-7 days')", (x["id"],), 0)
+        x["alerts_7d"] = d.scalar(
+            "SELECT COUNT(*) FROM exposure_alert WHERE business_id = ? AND dismissed = 0 AND created_at >= datetime('now','-7 days')",
+            (x["id"],),
+            0,
+        )
         businesses.append(x)
     alerts = []
     for r in d.all(
@@ -42,7 +46,9 @@ def mando() -> dict[str, Any]:
         a["countries"] = loads(a["countries"], [])
         alerts.append(a)
     decisions = []
-    for r in d.all("SELECT dl.*, b.name AS business_name FROM decision_log dl LEFT JOIN business_unit b ON b.id = dl.business_id ORDER BY decided_at DESC"):
+    for r in d.all(
+        "SELECT dl.*, b.name AS business_name FROM decision_log dl LEFT JOIN business_unit b ON b.id = dl.business_id ORDER BY decided_at DESC"
+    ):
         x = dict(r)
         x["premises"] = loads(x["premises"], [])
         x["alternatives"] = loads(x["alternatives"], [])
@@ -65,7 +71,21 @@ def mando() -> dict[str, Any]:
         )
         from ..embed import normalize_text
 
-        terms = [normalize_text(r.split("(")[0].strip()) for r in regs if r] + ["ai act", "ehds", "mdr", "rgpd", "gdpr", "complementos alimenticios", "productos sanitarios", "ensayos clínicos", "salud digital", "datos de salud", "formación profesional", "impuesto de sociedades", "fiscalidad"]
+        terms = [normalize_text(r.split("(")[0].strip()) for r in regs if r] + [
+            "ai act",
+            "ehds",
+            "mdr",
+            "rgpd",
+            "gdpr",
+            "complementos alimenticios",
+            "productos sanitarios",
+            "ensayos clínicos",
+            "salud digital",
+            "datos de salud",
+            "formación profesional",
+            "impuesto de sociedades",
+            "fiscalidad",
+        ]
         terms = [t for t in terms if t]
         for r in rows:
             blob = normalize_text(f"{r['title']} {r['lede'] or ''}")
@@ -76,7 +96,13 @@ def mando() -> dict[str, Any]:
                 reg_docs.append(x)
             if len(reg_docs) >= 40:
                 break
-    return {"businesses": businesses, "alerts": alerts, "decisions": decisions, "regulatory": reg_docs, "profile_note": "Los negocios se cargan de config/perfil.yaml y no salen de esta máquina."}
+    return {
+        "businesses": businesses,
+        "alerts": alerts,
+        "decisions": decisions,
+        "regulatory": reg_docs,
+        "profile_note": "Los negocios se cargan de config/perfil.yaml y no salen de esta máquina.",
+    }
 
 
 @router.post("/mando/alerts/{alert_id}/dismiss")
@@ -106,7 +132,18 @@ def create_decision(body: DecisionIn) -> dict[str, Any]:
         conn.execute(
             """INSERT INTO decision_log(id, business_id, title, context, premises, alternatives, success_probability, premortem, decided_at, review_at)
                VALUES (?,?,?,?,?,?,?,?,?,?)""",
-            (did, body.business_id, body.title, body.context, dumps(body.premises), dumps(body.alternatives), body.success_probability, body.premortem, now_iso(), body.review_at),
+            (
+                did,
+                body.business_id,
+                body.title,
+                body.context,
+                dumps(body.premises),
+                dumps(body.alternatives),
+                body.success_probability,
+                body.premortem,
+                now_iso(),
+                body.review_at,
+            ),
         )
     return {"id": did}
 
@@ -150,7 +187,10 @@ def diet_log(body: LogIn) -> dict[str, Any]:
             topics = (loads(ev["coverage_stats"], {}) or {}).get("topics") or []
             topic = topics[0] if topics else ev["domain"]
     with d.tx() as conn:
-        conn.execute("INSERT INTO reading_log(document_id, event_id, source_id, action, seconds, at, topic) VALUES (?,?,?,?,?,?,?)", (body.document_id, body.event_id, source_id, body.action, body.seconds, now_iso(), topic))
+        conn.execute(
+            "INSERT INTO reading_log(document_id, event_id, source_id, action, seconds, at, topic) VALUES (?,?,?,?,?,?,?)",
+            (body.document_id, body.event_id, source_id, body.action, body.seconds, now_iso(), topic),
+        )
     return {"ok": True}
 
 
@@ -172,7 +212,12 @@ def brief_latest(kind: str = "study") -> dict[str, Any]:
     c["id"] = r["id"]
     c["composed_by"] = r["composed_by"]
     c["created_at"] = r["created_at"]
-    history = [dict(x) for x in d.all("SELECT id, date, kind, composed_by, created_at FROM brief ORDER BY created_at DESC LIMIT 30")]
+    history = [
+        dict(x)
+        for x in d.all(
+            "SELECT id, date, kind, composed_by, created_at FROM brief ORDER BY created_at DESC LIMIT 30"
+        )
+    ]
     return {"brief": c, "history": history}
 
 
@@ -200,32 +245,55 @@ def brief_generate(kind: str = "study", hours: int = 24) -> dict[str, Any]:
 @router.get("/machine")
 def machine() -> dict[str, Any]:
     d = db()
-    sources = [dict(r) for r in d.all(
-        """SELECT id, slug, name, tier, type, country, region_bloc, active, feeds, feed_status, poll_minutes, last_polled_at, last_ok_at, last_error, last_items,
+    sources = [
+        dict(r)
+        for r in d.all(
+            """SELECT id, slug, name, tier, type, country, region_bloc, active, feeds, feed_status, poll_minutes, last_polled_at, last_ok_at, last_error, last_items,
                   (SELECT COUNT(*) FROM document WHERE document.source_id = source.id AND fetched_at >= datetime('now','-1 day')) AS docs_24h
            FROM source ORDER BY active DESC, tier, name"""
-    )]
+        )
+    ]
     for s in sources:
         s["feeds"] = loads(s["feeds"], [])
     jobs = [dict(r) for r in d.all("SELECT * FROM job_run ORDER BY id DESC LIMIT 40")]
     for j in jobs:
         j["stats"] = loads(j["stats"], {})
     llm = get_llm(d)
-    cost_by_day = [dict(r) for r in d.all("SELECT substr(at,1,10) AS day, module, model, COUNT(*) n, SUM(cost_usd) cost, SUM(input_tokens) input_tokens, SUM(output_tokens) output_tokens, SUM(cache_read_tokens) cache_read FROM llm_call GROUP BY day, module, model ORDER BY day DESC LIMIT 200")]
-    recent_calls = [dict(r) for r in d.all("SELECT id, at, module, agent, model, input_tokens, output_tokens, cache_read_tokens, cost_usd, latency_ms, ok, error FROM llm_call ORDER BY id DESC LIMIT 30")]
+    cost_by_day = [
+        dict(r)
+        for r in d.all(
+            "SELECT substr(at,1,10) AS day, module, model, COUNT(*) n, SUM(cost_usd) cost, SUM(input_tokens) input_tokens, SUM(output_tokens) output_tokens, SUM(cache_read_tokens) cache_read FROM llm_call GROUP BY day, module, model ORDER BY day DESC LIMIT 200"
+        )
+    ]
+    recent_calls = [
+        dict(r)
+        for r in d.all(
+            "SELECT id, at, module, agent, model, input_tokens, output_tokens, cache_read_tokens, cost_usd, latency_ms, ok, error FROM llm_call ORDER BY id DESC LIMIT 30"
+        )
+    ]
     totals = {
         "sources_total": len(sources),
         "sources_active": sum(1 for s in sources if s["active"]),
         "sources_with_feed": sum(1 for s in sources if s["feeds"]),
         "sources_ok_24h": sum(1 for s in sources if s["last_ok_at"] and s["last_ok_at"] >= (now_iso()[:10])),
         "documents": d.scalar("SELECT COUNT(*) FROM document", (), 0),
-        "documents_24h": d.scalar("SELECT COUNT(*) FROM document WHERE fetched_at >= datetime('now','-1 day')", (), 0),
+        "documents_24h": d.scalar(
+            "SELECT COUNT(*) FROM document WHERE fetched_at >= datetime('now','-1 day')", (), 0
+        ),
         "events": d.scalar("SELECT COUNT(*) FROM event WHERE status != 'merged'", (), 0),
         "claims": d.scalar("SELECT COUNT(*) FROM claim", (), 0),
         "claims_confirmed": d.scalar("SELECT COUNT(*) FROM claim WHERE status = 'confirmed'", (), 0),
         "db_size_mb": round((d.path.stat().st_size / 1e6) if d.path.exists() else 0, 1),
     }
-    return {"sources": sources, "jobs": jobs, "budget": llm.budget_state(), "llm_cost": cost_by_day, "llm_recent": recent_calls, "totals": totals, "embedder": __import__("atlas_core.embed", fromlist=["get_embedder"]).get_embedder().name}
+    return {
+        "sources": sources,
+        "jobs": jobs,
+        "budget": llm.budget_state(),
+        "llm_cost": cost_by_day,
+        "llm_recent": recent_calls,
+        "totals": totals,
+        "embedder": __import__("atlas_core.embed", fromlist=["get_embedder"]).get_embedder().name,
+    }
 
 
 _running: dict[str, bool] = {}
@@ -244,7 +312,9 @@ async def _bg(job: str, coro) -> None:
 
 
 @router.post("/machine/ingest")
-async def trigger_ingest(background: BackgroundTasks, force: bool = False, limit: int | None = None) -> dict[str, Any]:
+async def trigger_ingest(
+    background: BackgroundTasks, force: bool = False, limit: int | None = None
+) -> dict[str, Any]:
     if _running.get("ingest"):
         return {"started": False, "reason": "ya hay una ingesta en curso"}
     background.add_task(_bg, "ingest", run_ingest(db(), force=force, limit_sources=limit))
@@ -289,7 +359,12 @@ def alerts() -> dict[str, Any]:
     rows = [dict(r) for r in d.all("SELECT * FROM alert ORDER BY created_at DESC LIMIT 50")]
     for r in rows:
         r["ref"] = loads(r["ref"], {})
-    high = [event_out(r) for r in d.all("SELECT * FROM event WHERE materiality >= 80 AND last_update_at >= datetime('now','-1 day') ORDER BY materiality DESC LIMIT 10")]
+    high = [
+        event_out(r)
+        for r in d.all(
+            "SELECT * FROM event WHERE materiality >= 80 AND last_update_at >= datetime('now','-1 day') ORDER BY materiality DESC LIMIT 10"
+        )
+    ]
     return {"alerts": rows, "high_materiality": high, "unread": sum(1 for r in rows if not r["read"])}
 
 
@@ -305,7 +380,13 @@ def alerts_read() -> dict[str, Any]:
 def get_settings() -> dict[str, Any]:
     d = db()
     prof = profile_config().get("preferencias_atlas", {}) or {}
-    defaults = {"theme": "light" if prof.get("tema") != "oscuro" else "dark", "mode": prof.get("modo_inicio", "ANALISTA"), "cat_enabled": True, "density": "compact", "brief_hour": profile_config().get("usuario", {}).get("hora_brief", "07:00")}
+    defaults = {
+        "theme": "light" if prof.get("tema") != "oscuro" else "dark",
+        "mode": prof.get("modo_inicio", "ANALISTA"),
+        "cat_enabled": True,
+        "density": "compact",
+        "brief_hour": profile_config().get("usuario", {}).get("hora_brief", "07:00"),
+    }
     stored = d.get_setting("ui", {}) or {}
     return {**defaults, **stored}
 
@@ -314,7 +395,9 @@ def get_settings() -> dict[str, Any]:
 def put_settings(body: dict[str, Any]) -> dict[str, Any]:
     d = db()
     current = d.get_setting("ui", {}) or {}
-    current.update({k: v for k, v in body.items() if k in ("theme", "mode", "cat_enabled", "density", "brief_hour")})
+    current.update(
+        {k: v for k, v in body.items() if k in ("theme", "mode", "cat_enabled", "density", "brief_hour")}
+    )
     with d.tx():
         d.set_setting("ui", current)
     return current
@@ -325,28 +408,81 @@ def search(q: str, limit: int = 8) -> dict[str, Any]:
     d = db()
     q = q.strip()
     if not q:
-        return {"events": [], "documents": [], "entities": [], "notes": [], "questions": [], "cases": [], "countries": []}
+        return {
+            "events": [],
+            "documents": [],
+            "entities": [],
+            "notes": [],
+            "questions": [],
+            "cases": [],
+            "countries": [],
+        }
     like = f"%{q}%"
-    events = [event_out(r) for r in d.all("SELECT * FROM event WHERE status != 'merged' AND title_neutral LIKE ? ORDER BY last_update_at DESC LIMIT ?", (like, limit))]
+    events = [
+        event_out(r)
+        for r in d.all(
+            "SELECT * FROM event WHERE status != 'merged' AND title_neutral LIKE ? ORDER BY last_update_at DESC LIMIT ?",
+            (like, limit),
+        )
+    ]
     docs = []
     try:
         fts_q = " ".join(f'"{t}"' for t in q.replace('"', "").split()[:6])
-        docs = [doc_out(r) for r in d.all(
-            """SELECT d.*, s.name AS source_name, s.tier FROM document_fts f JOIN document d ON d.id = f.doc_id JOIN source s ON s.id = d.source_id
+        docs = [
+            doc_out(r)
+            for r in d.all(
+                """SELECT d.*, s.name AS source_name, s.tier FROM document_fts f JOIN document d ON d.id = f.doc_id JOIN source s ON s.id = d.source_id
                WHERE document_fts MATCH ? ORDER BY bm25(document_fts) LIMIT ?""",
-            (fts_q, limit),
-        )]
+                (fts_q, limit),
+            )
+        ]
     except Exception:  # noqa: BLE001 - consulta FTS malformada
         docs = []
-    entities = [dict(r) for r in d.all("SELECT id, kind, name, country FROM entity WHERE name LIKE ? OR aliases LIKE ? LIMIT ?", (like, f"%{q.lower()}%", limit))]
-    notes = [dict(r) for r in d.all("SELECT id, title, updated_at FROM note WHERE title LIKE ? OR body_text LIKE ? LIMIT ?", (like, like, limit))]
-    questions = [dict(r) for r in d.all("SELECT id, title, status, close_at FROM forecast_question WHERE title LIKE ? LIMIT ?", (like, limit))]
-    cases = [dict(r) for r in d.all("SELECT id, name, category, start_date FROM historical_case WHERE name LIKE ? OR summary LIKE ? LIMIT ?", (like, like, limit))]
+    entities = [
+        dict(r)
+        for r in d.all(
+            "SELECT id, kind, name, country FROM entity WHERE name LIKE ? OR aliases LIKE ? LIMIT ?",
+            (like, f"%{q.lower()}%", limit),
+        )
+    ]
+    notes = [
+        dict(r)
+        for r in d.all(
+            "SELECT id, title, updated_at FROM note WHERE title LIKE ? OR body_text LIKE ? LIMIT ?",
+            (like, like, limit),
+        )
+    ]
+    questions = [
+        dict(r)
+        for r in d.all(
+            "SELECT id, title, status, close_at FROM forecast_question WHERE title LIKE ? LIMIT ?",
+            (like, limit),
+        )
+    ]
+    cases = [
+        dict(r)
+        for r in d.all(
+            "SELECT id, name, category, start_date FROM historical_case WHERE name LIKE ? OR summary LIKE ? LIMIT ?",
+            (like, like, limit),
+        )
+    ]
     from ..gazetteer import countries as gz
 
     ql = q.lower()
-    countries = [{"iso2": c.iso2, "name": c.name_es} for c in gz().values() if ql in c.name_es.lower() or ql in c.name_en.lower() or ql == c.iso2.lower()][:limit]
-    return {"events": events, "documents": docs, "entities": entities, "notes": notes, "questions": questions, "cases": cases, "countries": countries}
+    countries = [
+        {"iso2": c.iso2, "name": c.name_es}
+        for c in gz().values()
+        if ql in c.name_es.lower() or ql in c.name_en.lower() or ql == c.iso2.lower()
+    ][:limit]
+    return {
+        "events": events,
+        "documents": docs,
+        "entities": entities,
+        "notes": notes,
+        "questions": questions,
+        "cases": cases,
+        "countries": countries,
+    }
 
 
 __all__ = ["router", "asyncio"]

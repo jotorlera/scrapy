@@ -17,36 +17,152 @@ from ..embed import normalize_text
 from ..util import parse_iso
 from .claims import claims_for_event
 
-EU = {"AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "SE", "GB", "CH", "NO", "UA", "RS", "MD", "AD", "MC"}
+EU = {
+    "AT",
+    "BE",
+    "BG",
+    "HR",
+    "CY",
+    "CZ",
+    "DK",
+    "EE",
+    "FI",
+    "FR",
+    "DE",
+    "GR",
+    "HU",
+    "IE",
+    "IT",
+    "LV",
+    "LT",
+    "LU",
+    "MT",
+    "NL",
+    "PL",
+    "PT",
+    "RO",
+    "SK",
+    "SI",
+    "SE",
+    "GB",
+    "CH",
+    "NO",
+    "UA",
+    "RS",
+    "MD",
+    "AD",
+    "MC",
+}
 MIDEAST = {"IL", "PS", "IR", "SA", "AE", "QA", "SY", "LB", "IQ", "JO", "YE", "EG", "TR", "KW", "OM", "BH"}
 
 SECTIONS = [
-    ("ESPAÑA", 5), ("EUROPA", 5), ("EE. UU.", 3), ("ORIENTE MEDIO", 3), ("ECONOMÍA", 5), ("GEOPOLÍTICA", 5),
-    ("CIENCIA / IA / SALUD", 3), ("IDEAS", 2), ("MUNDO", 5),
+    ("ESPAÑA", 5),
+    ("EUROPA", 5),
+    ("EE. UU.", 3),
+    ("ORIENTE MEDIO", 3),
+    ("ECONOMÍA", 5),
+    ("GEOPOLÍTICA", 5),
+    ("CIENCIA / IA / SALUD", 3),
+    ("IDEAS", 2),
+    ("MUNDO", 5),
 ]
 
 CONCEPT_RULES: list[tuple[str, tuple[str, ...]]] = [
-    ("trilema de Mundell", ("tipo de cambio", "exchange rate", "capital controls", "banco central", "divisa")),
+    (
+        "trilema de Mundell",
+        ("tipo de cambio", "exchange rate", "capital controls", "banco central", "divisa"),
+    ),
     ("curva de Phillips", ("inflación", "inflation", "desempleo", "unemployment", "salarios", "wages")),
     ("dominancia fiscal", ("deuda", "debt", "déficit", "deficit", "tipos", "rates", "banco central")),
     ("ventaja comparativa", ("aranceles", "tariff", "comercio", "trade", "exportaciones", "exports")),
     ("riesgo moral", ("rescate", "bailout", "garantía", "guarantee", "banco", "bank")),
     ("externalidades", ("emisiones", "emissions", "contaminación", "pollution", "clima", "climate")),
-    ("dilema de seguridad", ("rearme", "defensa", "defence", "defense", "misiles", "missiles", "otan", "nato")),
+    (
+        "dilema de seguridad",
+        ("rearme", "defensa", "defence", "defense", "misiles", "missiles", "otan", "nato"),
+    ),
     ("equilibrio de poder", ("alianza", "alliance", "cumbre", "summit", "brics", "g7", "hegemon")),
     ("disuasión", ("nuclear", "deterrence", "misil", "missile", "ejército", "military")),
-    ("interdependencia compleja", ("cadena de suministro", "supply chain", "sanciones", "sanctions", "chips", "energía", "energy")),
-    ("guerra justa", ("civiles", "civilians", "bombardeo", "strike", "alto el fuego", "ceasefire", "rehenes", "hostages")),
-    ("soberanía", ("frontera", "border", "migración", "migration", "secesión", "independencia", "independence", "referéndum")),
+    (
+        "interdependencia compleja",
+        ("cadena de suministro", "supply chain", "sanciones", "sanctions", "chips", "energía", "energy"),
+    ),
+    (
+        "guerra justa",
+        ("civiles", "civilians", "bombardeo", "strike", "alto el fuego", "ceasefire", "rehenes", "hostages"),
+    ),
+    (
+        "soberanía",
+        (
+            "frontera",
+            "border",
+            "migración",
+            "migration",
+            "secesión",
+            "independencia",
+            "independence",
+            "referéndum",
+        ),
+    ),
     ("legitimidad", ("elecciones", "election", "protesta", "protest", "golpe", "coup", "tribunal", "court")),
-    ("separación de poderes", ("tribunal", "court", "juez", "judge", "supremo", "constitucional", "fiscal", "amnistía")),
+    (
+        "separación de poderes",
+        ("tribunal", "court", "juez", "judge", "supremo", "constitucional", "fiscal", "amnistía"),
+    ),
     ("populismo", ("populis", "extrema derecha", "far-right", "far right", "ultraderecha", "antisistema")),
     ("polarización", ("polariza", "polarization", "crispación", "bloqueo", "gridlock")),
-    ("estado de derecho", ("estado de derecho", "rule of law", "corrupción", "corruption", "independencia judicial")),
-    ("paternalismo", ("prohibición", "ban", "regulación", "regulation", "salud pública", "public health", "vacuna", "vaccine")),
-    ("justicia distributiva", ("impuestos", "taxes", "desigualdad", "inequality", "renta", "income", "pensiones", "pensions", "vivienda", "housing")),
-    ("libertad negativa", ("censura", "censorship", "libertad de expresión", "free speech", "vigilancia", "surveillance")),
-    ("geografía y poder", ("estrecho", "strait", "canal", "ártico", "arctic", "groenlandia", "greenland", "ormuz", "hormuz", "taiwán", "taiwan")),
+    (
+        "estado de derecho",
+        ("estado de derecho", "rule of law", "corrupción", "corruption", "independencia judicial"),
+    ),
+    (
+        "paternalismo",
+        (
+            "prohibición",
+            "ban",
+            "regulación",
+            "regulation",
+            "salud pública",
+            "public health",
+            "vacuna",
+            "vaccine",
+        ),
+    ),
+    (
+        "justicia distributiva",
+        (
+            "impuestos",
+            "taxes",
+            "desigualdad",
+            "inequality",
+            "renta",
+            "income",
+            "pensiones",
+            "pensions",
+            "vivienda",
+            "housing",
+        ),
+    ),
+    (
+        "libertad negativa",
+        ("censura", "censorship", "libertad de expresión", "free speech", "vigilancia", "surveillance"),
+    ),
+    (
+        "geografía y poder",
+        (
+            "estrecho",
+            "strait",
+            "canal",
+            "ártico",
+            "arctic",
+            "groenlandia",
+            "greenland",
+            "ormuz",
+            "hormuz",
+            "taiwán",
+            "taiwan",
+        ),
+    ),
 ]
 
 SOCRATIC = [
@@ -79,7 +195,14 @@ def _section_for(ev: dict[str, Any]) -> str:
     if cs & EU:
         return "EUROPA"
     if dom == "society" or dom == "law":
-        return "IDEAS" if any(k in normalize_text(ev.get("title_neutral", "")) for k in ("filosof", "univers", "libro", "book", "idea", "debate")) else "MUNDO"
+        return (
+            "IDEAS"
+            if any(
+                k in normalize_text(ev.get("title_neutral", ""))
+                for k in ("filosof", "univers", "libro", "book", "idea", "debate")
+            )
+            else "MUNDO"
+        )
     return "MUNDO"
 
 
@@ -98,15 +221,21 @@ def _why_it_matters(ev: dict[str, Any]) -> str:
     br = ev.get("materiality_breakdown") or {}
     contrib = br.get("contributions") or {}
     names = {
-        "power": "actores de gran peso", "irreversibility": "cambio difícil de revertir", "breadth": "afecta a varios países",
-        "primary_document": "hay documento primario", "independent_coverage": "cobertura independiente amplia",
-        "delta_state": "mueve variables de estado", "novelty": "es nuevo",
+        "power": "actores de gran peso",
+        "irreversibility": "cambio difícil de revertir",
+        "breadth": "afecta a varios países",
+        "primary_document": "hay documento primario",
+        "independent_coverage": "cobertura independiente amplia",
+        "delta_state": "mueve variables de estado",
+        "novelty": "es nuevo",
     }
     top = sorted(((v, k) for k, v in contrib.items() if v > 0), reverse=True)[:2]
     reasons = [names.get(k, k) for _, k in top]
     if br.get("user_reasons"):
         reasons.append(br["user_reasons"][0])
-    return "; ".join(reasons).capitalize() if reasons else "Materialidad baja: se incluye por cuota de sección."
+    return (
+        "; ".join(reasons).capitalize() if reasons else "Materialidad baja: se incluye por cuota de sección."
+    )
 
 
 def _divergence(ev: dict[str, Any]) -> str:
@@ -114,10 +243,14 @@ def _divergence(ev: dict[str, Any]) -> str:
     sil = cov.get("silences") or []
     ideo = (cov.get("axes") or {}).get("ideology") or {}
     n_eco = len([k for k, v in ideo.items() if v.get("observed")])
-    parts = [f"{cov.get('n_sources', 0)} fuentes, {n_eco} ecosistemas ideológicos, {len(cov.get('langs') or [])} idiomas."]
+    parts = [
+        f"{cov.get('n_sources', 0)} fuentes, {n_eco} ecosistemas ideológicos, {len(cov.get('langs') or [])} idiomas."
+    ]
     if sil:
         s = sil[0]
-        parts.append(f"Silencio en {s['ecosystem']} ({s['axis']}): esperadas {s['expected']}, observadas {s['observed']}.")
+        parts.append(
+            f"Silencio en {s['ecosystem']} ({s['axis']}): esperadas {s['expected']}, observadas {s['observed']}."
+        )
     return " ".join(parts)
 
 
@@ -155,7 +288,7 @@ def compose_brief(db: Database, kind: str = "study", hours: int = 24) -> dict[st
                 buckets["MUNDO"].append(ev)
                 used.add(ev["id"])
     sections = []
-    for name, _q in (SECTIONS if kind != "executive" else [(k, v) for k, v in quotas.items()]):
+    for name, _q in SECTIONS if kind != "executive" else [(k, v) for k, v in quotas.items()]:
         items = []
         for ev in buckets.get(name, []):
             claims = claims_for_event(db, ev["id"], limit=8)
@@ -163,7 +296,17 @@ def compose_brief(db: Database, kind: str = "study", hours: int = 24) -> dict[st
             for c in claims:
                 if c["level"] == "opinion":
                     continue
-                facts.append({"text": c["text_canonical"], "status": c["status"], "level": c["level"], "claim_id": c["id"], "document_id": c["document_id"], "source": c["source_name"], "url": c["doc_url"]})
+                facts.append(
+                    {
+                        "text": c["text_canonical"],
+                        "status": c["status"],
+                        "level": c["level"],
+                        "claim_id": c["id"],
+                        "document_id": c["document_id"],
+                        "source": c["source_name"],
+                        "url": c["doc_url"],
+                    }
+                )
                 if len(facts) >= 3:
                     break
             primary = db.one(
@@ -171,10 +314,13 @@ def compose_brief(db: Database, kind: str = "study", hours: int = 24) -> dict[st
                    WHERE d.event_id = ? AND s.tier = 1 ORDER BY d.published_at LIMIT 1""",
                 (ev["id"],),
             )
-            exposures = [dict(x) for x in db.all(
-                "SELECT ea.channel, ea.confidence, b.name FROM exposure_alert ea JOIN business_unit b ON b.id = ea.business_id WHERE ea.event_id = ? AND ea.dismissed = 0",
-                (ev["id"],),
-            )]
+            exposures = [
+                dict(x)
+                for x in db.all(
+                    "SELECT ea.channel, ea.confidence, b.name FROM exposure_alert ea JOIN business_unit b ON b.id = ea.business_id WHERE ea.event_id = ? AND ea.dismissed = 0",
+                    (ev["id"],),
+                )
+            ]
             items.append(
                 {
                     "event_id": ev["id"],
@@ -186,13 +332,17 @@ def compose_brief(db: Database, kind: str = "study", hours: int = 24) -> dict[st
                     "narrative_divergence": _divergence(ev),
                     "primary_source": dict(primary) if primary else None,
                     "why_it_matters": _why_it_matters(ev),
-                    "course_concept": concept_for(" ".join([ev["title_neutral"]] + [f["text"] for f in facts])),
+                    "course_concept": concept_for(
+                        " ".join([ev["title_neutral"]] + [f["text"] for f in facts])
+                    ),
                     "exposures": exposures,
                 }
             )
         if items:
             sections.append({"name": name, "items": items})
-    q = db.one("SELECT id, title, close_at FROM forecast_question WHERE status = 'open' ORDER BY RANDOM() LIMIT 1")
+    q = db.one(
+        "SELECT id, title, close_at FROM forecast_question WHERE status = 'open' ORDER BY RANDOM() LIMIT 1"
+    )
     content = {
         "date": now_iso()[:10],
         "kind": kind,

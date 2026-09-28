@@ -42,8 +42,19 @@ async def lifespan(app: FastAPI):
         task.cancel()
 
 
-app = FastAPI(title="TORNILLO SUELTO · motor ATLAS", version=__version__, lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json")
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], allow_methods=["*"], allow_headers=["*"])
+app = FastAPI(
+    title="TORNILLO SUELTO · motor ATLAS",
+    version=__version__,
+    lifespan=lifespan,
+    docs_url="/api/docs",
+    openapi_url="/api/openapi.json",
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(analyst_router, prefix="/api", tags=["analista"])
 app.include_router(thinker_router, prefix="/api", tags=["pensador"])
@@ -90,4 +101,8 @@ else:
 
     @app.get("/", include_in_schema=False)
     def no_frontend():
-        return JSONResponse({"message": "Frontend no compilado. Ejecuta `make web` (o `pnpm --dir apps/web build`). La API está en /api/docs."})
+        return JSONResponse(
+            {
+                "message": "Frontend no compilado. Ejecuta `make web` (o `pnpm --dir apps/web build`). La API está en /api/docs."
+            }
+        )

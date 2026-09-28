@@ -270,7 +270,8 @@ class Database:
                 if not self._initialized:
                     conn.executescript(SCHEMA)
                     conn.execute(
-                        "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),)
+                        "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)",
+                        (str(SCHEMA_VERSION),),
                     )
                     self._initialized = True
         return conn

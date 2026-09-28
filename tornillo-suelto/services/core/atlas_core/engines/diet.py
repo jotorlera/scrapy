@@ -57,7 +57,9 @@ def diet_report(db: Database, days: int = 7, blind_spot_minutes: float = 5.0) ->
         eco, secs = max(dist.items(), key=lambda kv: kv[1])
         share = secs / tot
         if share > 0.8:
-            blind.append({"topic": topic, "ecosystem": eco, "share": round(share, 2), "minutes": round(tot / 60, 1)})
+            blind.append(
+                {"topic": topic, "ecosystem": eco, "share": round(share, 2), "minutes": round(tot / 60, 1)}
+            )
     return {
         "days": days,
         "minutes": round(total_seconds / 60, 1),

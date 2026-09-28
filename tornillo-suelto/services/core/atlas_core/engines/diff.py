@@ -11,7 +11,10 @@ from typing import Any
 from ..util import split_sentences
 
 _NUM = re.compile(r"\d")
-_MODAL = re.compile(r"\b(will|shall|may|must|should|expects?|intend|deber[áa]|podr[áa]|prev[ée]|se compromete|mantendr[áa]|subir[áa]|bajar[áa]|raise|cut|hold|maintain|increase|decrease)\b", re.I)
+_MODAL = re.compile(
+    r"\b(will|shall|may|must|should|expects?|intend|deber[áa]|podr[áa]|prev[ée]|se compromete|mantendr[áa]|subir[áa]|bajar[áa]|raise|cut|hold|maintain|increase|decrease)\b",
+    re.I,
+)
 
 
 def _norm(s: str) -> str:
@@ -34,8 +37,12 @@ def diff_documents(old_text: str, new_text: str) -> dict[str, Any]:
             for k in range(max(len(olds), len(news))):
                 o = olds[k] if k < len(olds) else None
                 n = news[k] if k < len(news) else None
-                ops.append({"op": "replace", "old": o, "new": n, "inline": _inline(o, n) if o and n else None})
-                if (o and (_NUM.search(o) or _MODAL.search(o))) or (n and (_NUM.search(n) or _MODAL.search(n))):
+                ops.append(
+                    {"op": "replace", "old": o, "new": n, "inline": _inline(o, n) if o and n else None}
+                )
+                if (o and (_NUM.search(o) or _MODAL.search(o))) or (
+                    n and (_NUM.search(n) or _MODAL.search(n))
+                ):
                     material.append({"kind": "changed", "old": o, "new": n})
         elif tag == "delete":
             for o in olds:

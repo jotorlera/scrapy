@@ -22,7 +22,11 @@ def seed() -> None:
 
 
 @app.command()
-def ingest(force: bool = typer.Option(False, help="Ignora el intervalo de sondeo"), limit: int | None = typer.Option(None, help="Máximo de fuentes"), llm: bool = typer.Option(False, help="Usar extractor LLM si hay clave")) -> None:
+def ingest(
+    force: bool = typer.Option(False, help="Ignora el intervalo de sondeo"),
+    limit: int | None = typer.Option(None, help="Máximo de fuentes"),
+    llm: bool = typer.Option(False, help="Usar extractor LLM si hay clave"),
+) -> None:
     """Una pasada de ingesta: feeds → documentos → eventos → afirmaciones → materialidad."""
     from .pipeline import run_ingest
 
@@ -53,12 +57,16 @@ def brief(kind: str = "study", hours: int = 24, redact: bool = False) -> None:
 
     db = get_db()
     b = compose_brief(db, kind=kind, hours=hours)
-    typer.echo(f"Brief {b['id']} · {sum(len(s['items']) for s in b['sections'])} ítems en {len(b['sections'])} secciones")
+    typer.echo(
+        f"Brief {b['id']} · {sum(len(s['items']) for s in b['sections'])} ítems en {len(b['sections'])} secciones"
+    )
     for s in b["sections"]:
         typer.echo(f"\n## {s['name']}")
         for it in s["items"]:
             typer.echo(f"- [{it['materiality']:.0f}] {it['title']}  ({it['course_concept'] or '—'})")
-    typer.echo(f"\nPronóstico: {b['forecast_prompt']['title'] if b['forecast_prompt'] else '—'}\nSocrática: {b['socratic_prompt']}")
+    typer.echo(
+        f"\nPronóstico: {b['forecast_prompt']['title'] if b['forecast_prompt'] else '—'}\nSocrática: {b['socratic_prompt']}"
+    )
     if redact:
         from .agents import redact_brief
 
@@ -77,7 +85,25 @@ def serve(host: str = settings.atlas_host, port: int = settings.atlas_port, relo
 def stats() -> None:
     """Resumen de la base de datos."""
     db = get_db()
-    out = {t: db.scalar(f"SELECT COUNT(*) FROM {t}", (), 0) for t in ("source", "document", "event", "claim", "claim_evidence", "state_delta", "forecast_question", "forecast", "prediction_market", "market_quote", "historical_case", "note", "llm_call", "job_run")}
+    out = {
+        t: db.scalar(f"SELECT COUNT(*) FROM {t}", (), 0)
+        for t in (
+            "source",
+            "document",
+            "event",
+            "claim",
+            "claim_evidence",
+            "state_delta",
+            "forecast_question",
+            "forecast",
+            "prediction_market",
+            "market_quote",
+            "historical_case",
+            "note",
+            "llm_call",
+            "job_run",
+        )
+    }
     out["llm_cost_usd_total"] = db.scalar("SELECT COALESCE(SUM(cost_usd),0) FROM llm_call", (), 0)
     typer.echo(json.dumps(out, indent=2))
 

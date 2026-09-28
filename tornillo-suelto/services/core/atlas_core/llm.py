@@ -112,7 +112,9 @@ class LLM:
     # ---------- presupuesto ----------
     def spent_today(self) -> float:
         day = datetime.now(UTC).date().isoformat()
-        v = self.db.scalar("SELECT COALESCE(SUM(cost_usd), 0) FROM llm_call WHERE substr(at, 1, 10) = ?", (day,), 0.0)
+        v = self.db.scalar(
+            "SELECT COALESCE(SUM(cost_usd), 0) FROM llm_call WHERE substr(at, 1, 10) = ?", (day,), 0.0
+        )
         return float(v or 0.0)
 
     def budget_state(self) -> dict[str, Any]:
@@ -136,22 +138,51 @@ class LLM:
             raise LLMUnavailable("Agentes desactivados: añade ANTHROPIC_API_KEY en .env")
         st = self.budget_state()
         if st["hard_stop"]:
-            raise BudgetExceeded(f"Tope diario alcanzado ({st['spent_today_usd']:.2f} de {st['daily_cap_usd']:.2f} USD)")
+            raise BudgetExceeded(
+                f"Tope diario alcanzado ({st['spent_today_usd']:.2f} de {st['daily_cap_usd']:.2f} USD)"
+            )
         if st["pause_noncritical"] and not critical:
             raise BudgetExceeded(
                 f"80% del presupuesto diario gastado ({st['spent_today_usd']:.2f} USD): tareas no críticas en pausa"
             )
 
     # ---------- registro ----------
-    def _log(self, module: str, agent: str, prompt_name: str, version: str, model: str, usage: Usage, latency_ms: int, ok: bool, error: str | None = None, meta: dict | None = None) -> float:
+    def _log(
+        self,
+        module: str,
+        agent: str,
+        prompt_name: str,
+        version: str,
+        model: str,
+        usage: Usage,
+        latency_ms: int,
+        ok: bool,
+        error: str | None = None,
+        meta: dict | None = None,
+    ) -> float:
         cost = usage.cost(model)
         with self.db.tx() as conn:
             conn.execute(
                 """INSERT INTO llm_call(at, module, agent, prompt_name, prompt_version, model, input_tokens, output_tokens,
                    cache_read_tokens, cache_write_tokens, cost_usd, latency_ms, ok, error, meta)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (now_iso(), module, agent, prompt_name, version, model, usage.input_tokens, usage.output_tokens,
-                 usage.cache_read, usage.cache_write, round(cost, 6), latency_ms, 1 if ok else 0, error, dumps(meta or {})),
+                (
+                    now_iso(),
+                    module,
+                    agent,
+                    prompt_name,
+                    version,
+                    model,
+                    usage.input_tokens,
+                    usage.output_tokens,
+                    usage.cache_read,
+                    usage.cache_write,
+                    round(cost, 6),
+                    latency_ms,
+                    1 if ok else 0,
+                    error,
+                    dumps(meta or {}),
+                ),
             )
         return cost
 
@@ -169,7 +200,10 @@ class LLM:
 
     def _params(self, tier_name: str, max_tokens: int | None) -> dict[str, Any]:
         t = self.tier(tier_name)
-        params: dict[str, Any] = {"model": t["model"], "max_tokens": int(max_tokens or t.get("max_tokens", 4096))}
+        params: dict[str, Any] = {
+            "model": t["model"],
+            "max_tokens": int(max_tokens or t.get("max_tokens", 4096)),
+        }
         thinking = t.get("thinking", "none")
         if thinking == "adaptive":
             params["thinking"] = {"type": "adaptive"}
@@ -205,12 +239,25 @@ class LLM:
             t0 = time.monotonic()
             try:
                 if schema is not None:
-                    resp = self._client.messages.parse(system=system, messages=messages, output_format=schema, **params)  # type: ignore[union-attr]
+                    resp = self._client.messages.parse(
+                        system=system, messages=messages, output_format=schema, **params
+                    )  # type: ignore[union-attr]
                 else:
                     resp = self._client.messages.create(system=system, messages=messages, **params)  # type: ignore[union-attr]
             except Exception as e:  # noqa: BLE001 - se registra y se relanza
                 latency = int((time.monotonic() - t0) * 1000)
-                self._log(module, agent, agent, version, model, Usage(), latency, False, f"{type(e).__name__}: {e}", meta)
+                self._log(
+                    module,
+                    agent,
+                    agent,
+                    version,
+                    model,
+                    Usage(),
+                    latency,
+                    False,
+                    f"{type(e).__name__}: {e}",
+                    meta,
+                )
                 raise
             latency = int((time.monotonic() - t0) * 1000)
             usage = self._usage_of(resp)
@@ -222,17 +269,39 @@ class LLM:
                     parsed = schema.model_validate_json(text)
                 except ValidationError as ve:
                     last_err = str(ve)[:800]
-                    cost = self._log(module, agent, agent, version, model, usage, latency, False, "schema: " + last_err, meta)
+                    cost = self._log(
+                        module,
+                        agent,
+                        agent,
+                        version,
+                        model,
+                        usage,
+                        latency,
+                        False,
+                        "schema: " + last_err,
+                        meta,
+                    )
                     if attempt < retries:
                         messages = [
                             *messages,
                             {"role": "assistant", "content": text or "(vacío)"},
-                            {"role": "user", "content": f"La salida no valida contra el esquema: {last_err}. Devuelve solo el JSON correcto."},
+                            {
+                                "role": "user",
+                                "content": f"La salida no valida contra el esquema: {last_err}. Devuelve solo el JSON correcto.",
+                            },
                         ]
                         continue
                     raise ValueError(f"Salida no válida tras reintento: {last_err}") from ve
             cost = self._log(module, agent, agent, version, model, usage, latency, True, None, meta)
-            return LLMResult(text=text, parsed=parsed, model=model, usage=usage, cost_usd=cost, latency_ms=latency, stop_reason=getattr(resp, "stop_reason", None))
+            return LLMResult(
+                text=text,
+                parsed=parsed,
+                model=model,
+                usage=usage,
+                cost_usd=cost,
+                latency_ms=latency,
+                stop_reason=getattr(resp, "stop_reason", None),
+            )
         raise ValueError(last_err or "sin respuesta")
 
     def stream(
@@ -262,9 +331,31 @@ class LLM:
                 yield from stream.text_stream
                 final = stream.get_final_message()
         except Exception as e:  # noqa: BLE001
-            self._log(module, agent, agent, version, model, Usage(), int((time.monotonic() - t0) * 1000), False, f"{type(e).__name__}: {e}", meta)
+            self._log(
+                module,
+                agent,
+                agent,
+                version,
+                model,
+                Usage(),
+                int((time.monotonic() - t0) * 1000),
+                False,
+                f"{type(e).__name__}: {e}",
+                meta,
+            )
             raise
-        self._log(module, agent, agent, version, model, self._usage_of(final), int((time.monotonic() - t0) * 1000), True, None, meta)
+        self._log(
+            module,
+            agent,
+            agent,
+            version,
+            model,
+            self._usage_of(final),
+            int((time.monotonic() - t0) * 1000),
+            True,
+            None,
+            meta,
+        )
 
 
 _llm: LLM | None = None

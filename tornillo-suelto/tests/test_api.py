@@ -34,7 +34,12 @@ def test_radar_and_event_detail_after_processing(client, seeded):
     s3 = make_source(seeded, "t_guardian", tier=2, country="GB", bloc="anglo", ideology="center_left")
     title = "El Gobierno de España aprueba la ley de vivienda y entra en vigor en enero"
     for s in (s1, s2, s3):
-        make_doc(seeded, s, title, "La norma limita los alquileres en zonas tensionadas según el Ministerio de Vivienda.")
+        make_doc(
+            seeded,
+            s,
+            title,
+            "La norma limita los alquileres en zonas tensionadas según el Ministerio de Vivienda.",
+        )
     st = process_new_documents(seeded, use_llm=False)
     assert st["docs"] == 3
     r = client.get("/api/radar", params={"hours": 24})
@@ -54,7 +59,10 @@ def test_radar_and_event_detail_after_processing(client, seeded):
 
 
 def test_forecast_full_cycle_user_before_system(client):
-    r = client.post("/api/forecasts", json={"title": "corto", "resolution_criteria": "x", "close_at": "2027-01-01T00:00:00+00:00"})
+    r = client.post(
+        "/api/forecasts",
+        json={"title": "corto", "resolution_criteria": "x", "close_at": "2027-01-01T00:00:00+00:00"},
+    )
     assert r.status_code == 422
     r = client.post(
         "/api/forecasts",
@@ -71,23 +79,39 @@ def test_forecast_full_cycle_user_before_system(client):
     qid = r.json()["id"]
     q = client.get(f"/api/forecasts/{qid}").json()
     assert q["latest"]["base_rate"]["p"] == 0.45
-    r = client.post(f"/api/forecasts/{qid}/forecast", json={"probability": 0.7, "rationale": "mayoría estable"})
+    r = client.post(
+        f"/api/forecasts/{qid}/forecast", json={"probability": 0.7, "rationale": "mayoría estable"}
+    )
     assert r.json()["system_probability"] == 0.45
     r = client.post(f"/api/forecasts/{qid}/resolve", json={"outcome": 1})
     scores = r.json()["scores"]
-    assert scores["user"]["brier"] == pytest.approx(0.09) and scores["base_rate"]["brier"] == pytest.approx(0.3025)
+    assert scores["user"]["brier"] == pytest.approx(0.09) and scores["base_rate"]["brier"] == pytest.approx(
+        0.3025
+    )
     cal = client.get("/api/forecasts/calibration", params={"forecaster": "user"}).json()
     assert cal["calibration"]["n"] == 1
     assert any(s["forecaster"] == "user" and s["bss_vs_base_rate"] > 0 for s in cal["summary"])
 
 
 def test_notes_backlinks_and_cards(client):
-    a = client.post("/api/notes", json={"title": "Libertad negativa", "body_text": "Berlin distingue dos conceptos. Ver [[Pettit]]."}).json()["id"]
-    b = client.post("/api/notes", json={"title": "Pettit", "body_text": "Libertad como no dominación. Relación con [[Libertad negativa]]."}).json()["id"]
+    a = client.post(
+        "/api/notes",
+        json={"title": "Libertad negativa", "body_text": "Berlin distingue dos conceptos. Ver [[Pettit]]."},
+    ).json()["id"]
+    b = client.post(
+        "/api/notes",
+        json={
+            "title": "Pettit",
+            "body_text": "Libertad como no dominación. Relación con [[Libertad negativa]].",
+        },
+    ).json()["id"]
     n = client.get(f"/api/notes/{a}").json()
     assert n["links"] == ["Pettit"] and any(x["id"] == b for x in n["backlinks"])
     assert client.get(f"/api/notes/{a}/export.md").text.startswith("# Libertad negativa")
-    cid = client.post("/api/cards", json={"front": "¿Quién formuló la libertad como no dominación?", "back": "Philip Pettit"}).json()["id"]
+    cid = client.post(
+        "/api/cards",
+        json={"front": "¿Quién formuló la libertad como no dominación?", "back": "Philip Pettit"},
+    ).json()["id"]
     assert client.get("/api/cards", params={"due_only": True}).json()["due"] == 1
     r = client.post(f"/api/cards/{cid}/review", json={"rating": 3}).json()
     assert r["state"]["interval"] == 2.0
@@ -100,7 +124,10 @@ def test_argument_map_analysis(client):
     m = client.get(f"/api/agora/maps/{rbu['id']}").json()
     assert len(m["nodes"]) >= 10 and m["edges"]
     assert isinstance(m["analysis"]["unsupported"], list)
-    nid = client.post(f"/api/agora/maps/{rbu['id']}/nodes", json={"kind": "premise", "text": "Premisa sin apoyo añadida por el usuario"}).json()["id"]
+    nid = client.post(
+        f"/api/agora/maps/{rbu['id']}/nodes",
+        json={"kind": "premise", "text": "Premisa sin apoyo añadida por el usuario"},
+    ).json()["id"]
     m2 = client.get(f"/api/agora/maps/{rbu['id']}").json()
     assert any(u["id"] == nid for u in m2["analysis"]["unsupported"])
     assert client.get("/api/agora/genealogy").json()["nodes"]
@@ -130,8 +157,18 @@ def test_machine_room_and_settings(client):
 def test_mando_and_diet(client):
     m = client.get("/api/mando").json()
     assert len(m["businesses"]) == 4
-    did = client.post("/api/mando/decisions", json={"title": "Abrir sede en Andorra", "premises": ["fiscalidad estable"], "success_probability": 0.6, "premortem": "fracasó por falta de talento local"}).json()["id"]
+    did = client.post(
+        "/api/mando/decisions",
+        json={
+            "title": "Abrir sede en Andorra",
+            "premises": ["fiscalidad estable"],
+            "success_probability": 0.6,
+            "premortem": "fracasó por falta de talento local",
+        },
+    ).json()["id"]
     assert client.post(f"/api/mando/decisions/{did}/outcome", json={"outcome": "en curso"}).json()["ok"]
-    assert client.post("/api/diet/log", json={"action": "open", "seconds": 120, "topic": "Migración"}).json()["ok"]
+    assert client.post("/api/diet/log", json={"action": "open", "seconds": 120, "topic": "Migración"}).json()[
+        "ok"
+    ]
     rep = client.get("/api/diet/report").json()
     assert rep["n_logs"] == 1 and "entropy" in rep

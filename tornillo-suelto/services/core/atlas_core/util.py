@@ -70,7 +70,22 @@ def content_hash(*parts: str | None) -> str:
 
 
 _SENT_RE = re.compile(r"(?<=[.!?…])\s+(?=[A-ZÁÉÍÓÚÑÜ¿¡\"“«(])")
-_ABBR = ("Sr.", "Sra.", "Dr.", "Dra.", "EE. UU.", "Mr.", "Mrs.", "Ms.", "St.", "vs.", "Inc.", "Ltd.", "No.", "Nº.")
+_ABBR = (
+    "Sr.",
+    "Sra.",
+    "Dr.",
+    "Dra.",
+    "EE. UU.",
+    "Mr.",
+    "Mrs.",
+    "Ms.",
+    "St.",
+    "vs.",
+    "Inc.",
+    "Ltd.",
+    "No.",
+    "Nº.",
+)
 
 
 def split_sentences(text: str) -> list[str]:
@@ -111,7 +126,28 @@ def canonicalize_url(url: str) -> str:
         keep = []
         for kv in qs.split("&"):
             k = kv.split("=", 1)[0].lower()
-            if k.startswith("utm_") or k in {"fbclid", "gclid", "ref", "ref_src", "s", "mc_cid", "mc_eid", "ns_campaign", "ns_mchannel", "ns_source", "cmpid", "ocid", "at_medium", "at_campaign", "xtor", "smid", "partner", "ico", "srnd", "sref"}:
+            if k.startswith("utm_") or k in {
+                "fbclid",
+                "gclid",
+                "ref",
+                "ref_src",
+                "s",
+                "mc_cid",
+                "mc_eid",
+                "ns_campaign",
+                "ns_mchannel",
+                "ns_source",
+                "cmpid",
+                "ocid",
+                "at_medium",
+                "at_campaign",
+                "xtor",
+                "smid",
+                "partner",
+                "ico",
+                "srnd",
+                "sref",
+            }:
                 continue
             keep.append(kv)
         url = base + ("?" + "&".join(keep) if keep else "")

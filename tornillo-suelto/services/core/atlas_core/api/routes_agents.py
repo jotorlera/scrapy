@@ -23,7 +23,11 @@ def _status() -> dict[str, Any]:
     llm = get_llm(db())
     st = llm.budget_state()
     st["models"] = {k: v.get("model") for k, v in (llm.cfg.get("tiers") or {}).items()}
-    st["message"] = None if llm.enabled else "Agentes desactivados: añade ANTHROPIC_API_KEY en .env y reinicia. El resto de la herramienta funciona sin clave."
+    st["message"] = (
+        None
+        if llm.enabled
+        else "Agentes desactivados: añade ANTHROPIC_API_KEY en .env y reinicia. El resto de la herramienta funciona sin clave."
+    )
     return st
 
 
@@ -91,7 +95,11 @@ class SocraticIn(BaseModel):
 @router.post("/agents/socratic")
 async def socratic(body: SocraticIn):
     _require()
-    history = [{"role": h["role"], "content": h["content"]} for h in body.history if h.get("role") in ("user", "assistant") and h.get("content")]
+    history = [
+        {"role": h["role"], "content": h["content"]}
+        for h in body.history
+        if h.get("role") in ("user", "assistant") and h.get("content")
+    ]
     return EventSourceResponse(_sse(agents.socratic(db(), body.mode, body.message, history)))
 
 

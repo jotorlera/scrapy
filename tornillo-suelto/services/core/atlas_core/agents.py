@@ -147,17 +147,21 @@ def event_context(db: Database, event_id: str, max_claims: int = 20, max_docs: i
     )
     cov = loads(ev["coverage_stats"], {}) or {}
     lines = [
-        f"<evento id=\"{event_id}\">",
+        f'<evento id="{event_id}">',
         f"Título provisional: {ev['title_neutral']}",
         f"Dominio: {ev['domain']} · Países: {', '.join(loads(ev['countries'], []))} · Materialidad: {ev['materiality']}",
         f"Cobertura: {cov.get('n_sources', 0)} fuentes, {cov.get('n_primary', 0)} primarias, idiomas {cov.get('langs', [])}; silencios: {[s['ecosystem'] for s in cov.get('silences', [])]}",
         "Afirmaciones registradas (claim_id · nivel · estado · texto · fuente):",
     ]
     for c in claims:
-        lines.append(f"- {c['id']} · {c['level']} · {c['status']} · «{c['text_canonical']}» · {c['source_name']} (tier {c['source_tier']}) · doc {c['document_id']}")
+        lines.append(
+            f"- {c['id']} · {c['level']} · {c['status']} · «{c['text_canonical']}» · {c['source_name']} (tier {c['source_tier']}) · doc {c['document_id']}"
+        )
     lines.append("Documentos (document_id · fuente · tier · ecosistema · titular · entradilla):")
     for d in docs:
-        lines.append(f"<documento id=\"{d['id']}\" fuente=\"{d['name']}\" tier=\"{d['tier']}\" ideologia=\"{d['ideology_label']}\" bloque=\"{d['region_bloc']}\" fecha=\"{d['published_at']}\">{d['title']} — {(d['lede'] or '')[:400]}</documento>")
+        lines.append(
+            f'<documento id="{d["id"]}" fuente="{d["name"]}" tier="{d["tier"]}" ideologia="{d["ideology_label"]}" bloque="{d["region_bloc"]}" fecha="{d["published_at"]}">{d["title"]} — {(d["lede"] or "")[:400]}</documento>'
+        )
     lines.append("</evento>")
     return "\n".join(lines)
 
@@ -165,27 +169,44 @@ def event_context(db: Database, event_id: str, max_claims: int = 20, max_docs: i
 # ---------- agentes de línea ----------
 
 
-def extract_claims_llm(db: Database, doc: dict[str, Any], source: dict[str, Any], llm: LLM | None = None) -> list[ClaimCandidate]:
+def extract_claims_llm(
+    db: Database, doc: dict[str, Any], source: dict[str, Any], llm: LLM | None = None
+) -> list[ClaimCandidate]:
     llm = llm or get_llm(db)
     text = "\n".join(p for p in (doc.get("title"), doc.get("lede"), doc.get("text")) if p)[:12000]
     user = (
-        f"Documento a procesar:\n<documento id=\"{doc['id']}\" fuente=\"{source.get('name')}\" idioma=\"{doc.get('lang')}\" fecha=\"{doc.get('published_at')}\">\n{text}\n</documento>\n"
+        f'Documento a procesar:\n<documento id="{doc["id"]}" fuente="{source.get("name")}" idioma="{doc.get("lang")}" fecha="{doc.get("published_at")}">\n{text}\n</documento>\n'
         "Extrae entidades y afirmaciones atómicas con cita literal según tu contrato. Máximo 8 afirmaciones."
     )
-    res = llm.complete("bulk", "extractor", user, module="ingest", schema=ExtractorOutput, meta={"document_id": doc["id"]})
+    res = llm.complete(
+        "bulk", "extractor", user, module="ingest", schema=ExtractorOutput, meta={"document_id": doc["id"]}
+    )
     out: list[ClaimCandidate] = []
     dropped = 0
     version = llm.load_prompt("extractor")[1]
     tag = f"{res.model}:extractor@{version}"
-    for c in (res.parsed.claims if res.parsed else []):
+    for c in res.parsed.claims if res.parsed else []:
         if not quote_supported(c.quote, text):
             dropped += 1
             continue
         level = c.level if c.level in ("fact", "data", "academic", "opinion") else "fact"
-        out.append(ClaimCandidate(text=c.text_es, quote=c.quote[:300], level=level, check_worthy=max(0.0, min(1.0, c.check_worthy)), attributed_to=c.attributed_to, extracted_by=tag, meta={"text_original": c.text_original}))
+        out.append(
+            ClaimCandidate(
+                text=c.text_es,
+                quote=c.quote[:300],
+                level=level,
+                check_worthy=max(0.0, min(1.0, c.check_worthy)),
+                attributed_to=c.attributed_to,
+                extracted_by=tag,
+                meta={"text_original": c.text_original},
+            )
+        )
     if dropped:
         with db.tx() as conn:
-            conn.execute("UPDATE llm_call SET meta = json_set(meta, '$.dropped_unsupported_quotes', ?) WHERE id = (SELECT MAX(id) FROM llm_call)", (dropped,))
+            conn.execute(
+                "UPDATE llm_call SET meta = json_set(meta, '$.dropped_unsupported_quotes', ?) WHERE id = (SELECT MAX(id) FROM llm_call)",
+                (dropped,),
+            )
     return out
 
 
@@ -200,10 +221,21 @@ def neutral_title(db: Database, event_id: str, llm: LLM | None = None) -> str | 
         "valorativos, en presente, con el actor y la acción; y clasifica el dominio (politics|economy|conflict|society|technology|health|environment|law).\n"
         f"{facts}"
     )
-    res = llm.complete("bulk", "extractor", user, module="events", schema=NeutralTitle, max_tokens=300, meta={"event_id": event_id, "task": "neutral_title"})
+    res = llm.complete(
+        "bulk",
+        "extractor",
+        user,
+        module="events",
+        schema=NeutralTitle,
+        max_tokens=300,
+        meta={"event_id": event_id, "task": "neutral_title"},
+    )
     if res.parsed and res.parsed.title_es:
         with db.tx() as conn:
-            conn.execute("UPDATE event SET title_neutral = ?, title_source = 'llm', domain = COALESCE(?, domain) WHERE id = ?", (res.parsed.title_es.strip(), res.parsed.domain, event_id))
+            conn.execute(
+                "UPDATE event SET title_neutral = ?, title_source = 'llm', domain = COALESCE(?, domain) WHERE id = ?",
+                (res.parsed.title_es.strip(), res.parsed.domain, event_id),
+            )
         return res.parsed.title_es
     return None
 
@@ -214,23 +246,52 @@ def neutral_title(db: Database, event_id: str, llm: LLM | None = None) -> str | 
 def _start_run(db: Database, kind: str, ref: str | None) -> str:
     rid = new_id()
     with db.tx() as conn:
-        conn.execute("INSERT INTO agent_run(id, kind, ref, status, created_at) VALUES (?,?,?,?,?)", (rid, kind, ref, "running", now_iso()))
+        conn.execute(
+            "INSERT INTO agent_run(id, kind, ref, status, created_at) VALUES (?,?,?,?,?)",
+            (rid, kind, ref, "running", now_iso()),
+        )
     return rid
 
 
 def _finish_run(db: Database, rid: str, output: Any, ok: bool = True) -> None:
     with db.tx() as conn:
-        conn.execute("UPDATE agent_run SET status = ?, output = ?, finished_at = ? WHERE id = ?", ("done" if ok else "error", dumps(output), now_iso(), rid))
+        conn.execute(
+            "UPDATE agent_run SET status = ?, output = ?, finished_at = ? WHERE id = ?",
+            ("done" if ok else "error", dumps(output), now_iso(), rid),
+        )
 
 
-def stream_agent(db: Database, kind: str, agent: str, tier: str, user: str, ref: str | None = None, extra_system: str | None = None, history: list[dict[str, Any]] | None = None, module: str = "on_demand") -> Iterator[dict[str, Any]]:
+def stream_agent(
+    db: Database,
+    kind: str,
+    agent: str,
+    tier: str,
+    user: str,
+    ref: str | None = None,
+    extra_system: str | None = None,
+    history: list[dict[str, Any]] | None = None,
+    module: str = "on_demand",
+) -> Iterator[dict[str, Any]]:
     """Genera eventos SSE: {type: start|delta|done|error}. Guarda el resultado en agent_run."""
     llm = get_llm(db)
     rid = _start_run(db, kind, ref)
-    yield {"type": "start", "run_id": rid, "agent": agent, "model": llm.model_for(tier) if llm.enabled else None}
+    yield {
+        "type": "start",
+        "run_id": rid,
+        "agent": agent,
+        "model": llm.model_for(tier) if llm.enabled else None,
+    }
     chunks: list[str] = []
     try:
-        for delta in llm.stream(tier, agent, user, module=module, extra_system=extra_system, history=history, meta={"run_id": rid, "ref": ref}):
+        for delta in llm.stream(
+            tier,
+            agent,
+            user,
+            module=module,
+            extra_system=extra_system,
+            history=history,
+            meta={"run_id": rid, "ref": ref},
+        ):
             chunks.append(delta)
             yield {"type": "delta", "text": delta}
     except Exception as e:  # noqa: BLE001
@@ -249,7 +310,16 @@ def deepen(db: Database, event_id: str) -> Iterator[dict[str, Any]]:
         "entre corchetes y su estado), LO QUE SABEMOS / LO QUE NO SABEMOS, DISPUTADO, CONTEXTO, IMPACTO (mercados y, si procede, canal de exposición), "
         "y 1-3 PREGUNTAS DE PRONÓSTICO resolubles (criterio, fuente, fecha). Nada sin cita."
     )
-    return stream_agent(db, "deepen", "editor_jefe", "synthesis", user, ref=event_id, extra_system=study_context(), module="event_analysis")
+    return stream_agent(
+        db,
+        "deepen",
+        "editor_jefe",
+        "synthesis",
+        user,
+        ref=event_id,
+        extra_system=study_context(),
+        module="event_analysis",
+    )
 
 
 def explain_60s(db: Database, event_id: str) -> Iterator[dict[str, Any]]:
@@ -258,8 +328,12 @@ def explain_60s(db: Database, event_id: str) -> Iterator[dict[str, Any]]:
     return stream_agent(db, "explain", "analista_regional", "analysis", user, ref=event_id)
 
 
-def lens(db: Database, event_id: str | None, tradition: str, free_text: str | None = None) -> Iterator[dict[str, Any]]:
-    ctx = event_context(db, event_id, max_claims=10, max_docs=6) if event_id else f"<texto>{free_text}</texto>"
+def lens(
+    db: Database, event_id: str | None, tradition: str, free_text: str | None = None
+) -> Iterator[dict[str, Any]]:
+    ctx = (
+        event_context(db, event_id, max_claims=10, max_docs=6) if event_id else f"<texto>{free_text}</texto>"
+    )
     user = (
         f"{ctx}\n\n¿Cómo interpretaría esto la tradición o el autor «{tradition}»? Marca en la primera línea que es una RECONSTRUCCIÓN. "
         "Cita obras concretas (título y año) y distingue lo que el autor dijo de lo que se infiere. Termina con la mejor objeción desde otra tradición."
@@ -267,9 +341,20 @@ def lens(db: Database, event_id: str | None, tradition: str, free_text: str | No
     return stream_agent(db, "lens", "filosofo", "synthesis", user, ref=event_id, extra_system=study_context())
 
 
-def socratic(db: Database, mode: str, message: str, history: list[dict[str, Any]]) -> Iterator[dict[str, Any]]:
+def socratic(
+    db: Database, mode: str, message: str, history: list[dict[str, Any]]
+) -> Iterator[dict[str, Any]]:
     user = f"[modo: {mode}] {message}"
-    return stream_agent(db, "socratic", "tutor_socratico", "analysis", user, ref=mode, extra_system=study_context(), history=history)
+    return stream_agent(
+        db,
+        "socratic",
+        "tutor_socratico",
+        "analysis",
+        user,
+        ref=mode,
+        extra_system=study_context(),
+        history=history,
+    )
 
 
 def what_changed_country(db: Database, iso2: str, days: int) -> Iterator[dict[str, Any]]:
@@ -279,12 +364,17 @@ def what_changed_country(db: Database, iso2: str, days: int) -> Iterator[dict[st
            ORDER BY materiality DESC LIMIT 25""",
         (f'%"{iso2}"%', f"-{days} days"),
     )
-    lines = [f"País: {iso2}. Ventana: {days} días. Eventos registrados (event_id · materialidad · dominio · título):"]
+    lines = [
+        f"País: {iso2}. Ventana: {days} días. Eventos registrados (event_id · materialidad · dominio · título):"
+    ]
     for r in rows:
         lines.append(f"- {r['id']} · {r['materiality']} · {r['domain']} · {r['title_neutral']}")
         for c in claims_for_event(db, r["id"], limit=3):
             lines.append(f"    · claim {c['id']} ({c['status']}): {c['text_canonical']}")
-    user = "\n".join(lines) + "\n\nDevuelve las N cosas que han cambiado MATERIALMENTE (no titulares), cada una con claim_id, y separa hechos de interpretación."
+    user = (
+        "\n".join(lines)
+        + "\n\nDevuelve las N cosas que han cambiado MATERIALMENTE (no titulares), cada una con claim_id, y separa hechos de interpretación."
+    )
     return stream_agent(db, "what_changed", "analista_regional", "analysis", user, ref=iso2)
 
 
@@ -294,7 +384,15 @@ def what_changed_country(db: Database, iso2: str, days: int) -> Iterator[dict[st
 def normative_translation(db: Database, event_id: str) -> dict[str, Any]:
     llm = get_llm(db)
     ctx = event_context(db, event_id, max_claims=10, max_docs=6)
-    res = llm.complete("synthesis", "filosofo", f"{ctx}\n\nAplica el traductor normativo: 1-3 cuestiones normativas con 2-4 tradiciones cada una. Devuelve NormativeTranslation.", module="agora", schema=NormativeTranslation, extra_system=study_context(), meta={"event_id": event_id})
+    res = llm.complete(
+        "synthesis",
+        "filosofo",
+        f"{ctx}\n\nAplica el traductor normativo: 1-3 cuestiones normativas con 2-4 tradiciones cada una. Devuelve NormativeTranslation.",
+        module="agora",
+        schema=NormativeTranslation,
+        extra_system=study_context(),
+        meta={"event_id": event_id},
+    )
     out = res.parsed.model_dump() if res.parsed else {}
     out["cost_usd"] = res.cost_usd
     out["model"] = res.model
@@ -306,7 +404,14 @@ def normative_translation(db: Database, event_id: str) -> dict[str, Any]:
 def red_team(db: Database, event_id: str) -> dict[str, Any]:
     llm = get_llm(db)
     ctx = event_context(db, event_id)
-    res = llm.complete("synthesis", "equipo_rojo", f"{ctx}\n\nAtaca la interpretación dominante. Devuelve RedTeamReport.", module="event_analysis", schema=RedTeamReport, meta={"event_id": event_id})
+    res = llm.complete(
+        "synthesis",
+        "equipo_rojo",
+        f"{ctx}\n\nAtaca la interpretación dominante. Devuelve RedTeamReport.",
+        module="event_analysis",
+        schema=RedTeamReport,
+        meta={"event_id": event_id},
+    )
     out = res.parsed.model_dump() if res.parsed else {}
     out["cost_usd"] = res.cost_usd
     out["model"] = res.model
@@ -319,7 +424,14 @@ def what_if(db: Database, event_id: str | None, premise: str) -> dict[str, Any]:
     llm = get_llm(db)
     ctx = event_context(db, event_id, max_claims=10, max_docs=6) if event_id else ""
     user = f"{ctx}\n\nSIMULADOR modo C. Premisa: «{premise}». Propón 3-5 trayectorias con probabilidad (suman ≤ 1), desencadenantes y señales tempranas; añade la mejor objeción del equipo rojo. Etiqueta: SIMULACIÓN — no es predicción."
-    res = llm.complete("analysis", "superpronosticador", user, module="simulator", schema=WhatIfOutput, meta={"event_id": event_id})
+    res = llm.complete(
+        "analysis",
+        "superpronosticador",
+        user,
+        module="simulator",
+        schema=WhatIfOutput,
+        meta={"event_id": event_id},
+    )
     out = res.parsed.model_dump() if res.parsed else {}
     out["label"] = "SIMULACIÓN — no es predicción"
     out["cost_usd"] = res.cost_usd
@@ -340,43 +452,97 @@ def forecast_ensemble(db: Database, question_id: str, n: int | None = None) -> d
     from .config_loader import budget_config
 
     n = n or int(budget_config().get("limits", {}).get("forecast_ensemble_size", 5))
-    market = db.one("SELECT probability, venue, question FROM prediction_market WHERE id = ?", ((loads(q["market_links"], []) or [{}])[0].get("id", ""),))
-    context_evt = event_context(db, q["origin_event_id"], max_claims=12, max_docs=8) if q["origin_event_id"] else ""
+    market = db.one(
+        "SELECT probability, venue, question FROM prediction_market WHERE id = ?",
+        ((loads(q["market_links"], []) or [{}])[0].get("id", ""),),
+    )
+    context_evt = (
+        event_context(db, q["origin_event_id"], max_claims=12, max_docs=8) if q["origin_event_id"] else ""
+    )
     base = f"Pregunta: {q['title']}\nCriterio de resolución: {q['resolution_criteria']}\nFuente: {q['resolution_source']}\nCierre: {q['close_at']}\nTasa base registrada: {q['base_rate']} ({q['base_rate_note']})\n{context_evt}"
     individual = []
     for i in range(n):
         approach = APPROACHES[i % len(APPROACHES)]
         user = f"{base}\n\nRol A (pronosticador individual). Enfoque asignado: {approach}. No conoces otros pronósticos. Devuelve ForecasterOutput."
         try:
-            res = llm.complete("analysis", "superpronosticador", user, module="forecasting", schema=ForecasterOutput, meta={"question_id": question_id, "approach": approach})
+            res = llm.complete(
+                "analysis",
+                "superpronosticador",
+                user,
+                module="forecasting",
+                schema=ForecasterOutput,
+                meta={"question_id": question_id, "approach": approach},
+            )
         except Exception as e:  # noqa: BLE001
             individual.append({"approach": approach, "error": str(e)})
             continue
         p = fmath.clip(res.parsed.probability) if res.parsed else None
-        individual.append({"approach": approach, "probability": p, "output": res.parsed.model_dump() if res.parsed else None, "cost_usd": res.cost_usd})
+        individual.append(
+            {
+                "approach": approach,
+                "probability": p,
+                "output": res.parsed.model_dump() if res.parsed else None,
+                "cost_usd": res.cost_usd,
+            }
+        )
         if p is not None:
-            _store_forecast(db, question_id, f"agent:{approach}", p, (res.parsed.reference_class if res.parsed else ""))
+            _store_forecast(
+                db, question_id, f"agent:{approach}", p, (res.parsed.reference_class if res.parsed else "")
+            )
     probs = [x["probability"] for x in individual if x.get("probability") is not None]
     if not probs:
         return {"error": "ningún pronosticador devolvió probabilidad", "individual": individual}
     agg = fmath.aggregate_ensemble(probs)
     _store_forecast(db, question_id, "atlas_ensemble_raw", agg["raw"], "media de log-odds")
-    _store_forecast(db, question_id, "atlas_ensemble_extremized", agg["extremized"], f"extremización a={agg['a']}")
+    _store_forecast(
+        db, question_id, "atlas_ensemble_extremized", agg["extremized"], f"extremización a={agg['a']}"
+    )
     m = float(market["probability"]) if market else None
     p_final = fmath.blend_with_market(agg["extremized"], m, alpha=0.4)
     # agregador LLM (rol B)
-    summary = "\n".join(f"- {x['approach']}: p={x.get('probability')} · {json.dumps(x.get('output'), ensure_ascii=False)[:600]}" for x in individual)
+    summary = "\n".join(
+        f"- {x['approach']}: p={x.get('probability')} · {json.dumps(x.get('output'), ensure_ascii=False)[:600]}"
+        for x in individual
+    )
     user_b = f"{base}\n\nRol B (agregador). Pronósticos individuales:\n{summary}\nMercado: {m if m is not None else 'sin mercado enlazado'}\nAgregación matemática: raw={agg['raw']:.3f}, extremizada={agg['extremized']:.3f}, mezcla con mercado={p_final:.3f}. Devuelve AggregatorOutput."
     adjusted = None
     try:
-        res_b = llm.complete("synthesis", "superpronosticador", user_b, module="forecasting", schema=AggregatorOutput, meta={"question_id": question_id, "role": "aggregator"})
+        res_b = llm.complete(
+            "synthesis",
+            "superpronosticador",
+            user_b,
+            module="forecasting",
+            schema=AggregatorOutput,
+            meta={"question_id": question_id, "role": "aggregator"},
+        )
         if res_b.parsed:
             adjusted = res_b.parsed.model_dump()
-            _store_forecast(db, question_id, "atlas_llm_adjusted", fmath.clip(res_b.parsed.probability), res_b.parsed.summary_3_lines)
+            _store_forecast(
+                db,
+                question_id,
+                "atlas_llm_adjusted",
+                fmath.clip(res_b.parsed.probability),
+                res_b.parsed.summary_3_lines,
+            )
     except Exception as e:  # noqa: BLE001
         adjusted = {"error": str(e)}
-    _store_forecast(db, question_id, "atlas_final", p_final, "sigmoid(0.4·logit(ens)+0.6·logit(mercado))" if m is not None else "ensemble extremizado (sin mercado)")
-    out = {"question_id": question_id, "individual": individual, "aggregate": agg, "market": m, "final": p_final, "aggregator": adjusted}
+    _store_forecast(
+        db,
+        question_id,
+        "atlas_final",
+        p_final,
+        "sigmoid(0.4·logit(ens)+0.6·logit(mercado))"
+        if m is not None
+        else "ensemble extremizado (sin mercado)",
+    )
+    out = {
+        "question_id": question_id,
+        "individual": individual,
+        "aggregate": agg,
+        "market": m,
+        "final": p_final,
+        "aggregator": adjusted,
+    }
     rid = _start_run(db, "forecast_ensemble", question_id)
     _finish_run(db, rid, out)
     return out
@@ -403,14 +569,27 @@ def redact_brief(db: Database, brief_id: str) -> dict[str, Any]:
         "Redacta el Brief de estudio en markdown: por sección, cada ítem en ≤ 4 líneas (hechos con [claim_id], divergencia en una línea, primaria, por qué importa, concepto del grado). "
         "Cierra con la pregunta de pronóstico y la cuestión socrática. No añadas hechos que no estén en el contenido."
     )
-    res = llm.complete("synthesis", "editor_jefe", user, module="brief", critical=True, extra_system=study_context(), max_tokens=6000, meta={"brief_id": brief_id})
+    res = llm.complete(
+        "synthesis",
+        "editor_jefe",
+        user,
+        module="brief",
+        critical=True,
+        extra_system=study_context(),
+        max_tokens=6000,
+        meta={"brief_id": brief_id},
+    )
     content["redaction_md"] = res.text
     content["composed_by"] = "llm"
     with db.tx() as conn:
-        conn.execute("UPDATE brief SET composed_by = 'llm', content = ? WHERE id = ?", (dumps(content), brief_id))
+        conn.execute(
+            "UPDATE brief SET composed_by = 'llm', content = ? WHERE id = ?", (dumps(content), brief_id)
+        )
     return {"brief_id": brief_id, "cost_usd": res.cost_usd, "model": res.model, "redaction_md": res.text}
 
 
-def persist_llm_claims_for_document(db: Database, doc: dict[str, Any], source: dict[str, Any], event_id: str | None) -> dict[str, int]:
+def persist_llm_claims_for_document(
+    db: Database, doc: dict[str, Any], source: dict[str, Any], event_id: str | None
+) -> dict[str, int]:
     cands = extract_claims_llm(db, doc, source)
     return persist_claims(db, doc, source, event_id, cands)

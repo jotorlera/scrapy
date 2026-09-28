@@ -19,12 +19,17 @@ def embed_cases(db: Database) -> int:
             if r["embedding_model"] == emb.name:
                 continue
             v = emb.embed(f"{r['name']}. {r['category']}. {r['summary']} {r['outcome']}")
-            conn.execute("UPDATE historical_case SET embedding = ?, embedding_model = ? WHERE id = ?", (vec_to_blob(v), emb.name, r["id"]))
+            conn.execute(
+                "UPDATE historical_case SET embedding = ?, embedding_model = ? WHERE id = ?",
+                (vec_to_blob(v), emb.name, r["id"]),
+            )
             n += 1
     return n
 
 
-def analogs(db: Database, query_text: str, top_n: int = 4, category: str | None = None) -> list[dict[str, Any]]:
+def analogs(
+    db: Database, query_text: str, top_n: int = 4, category: str | None = None
+) -> list[dict[str, Any]]:
     emb = get_embedder()
     q = emb.embed(query_text)
     sql = "SELECT * FROM historical_case WHERE embedding IS NOT NULL AND embedding_model = ?"
@@ -54,7 +59,7 @@ def compare_cases(cases: list[dict[str, Any]]) -> dict[str, Any]:
     """Tabla de similitudes y diferencias sobre las variables codificadas."""
     keys: list[str] = []
     for c in cases:
-        for k in (c.get("variables") or {}):
+        for k in c.get("variables") or {}:
             if k not in keys:
                 keys.append(k)
     rows = []
@@ -62,4 +67,10 @@ def compare_cases(cases: list[dict[str, Any]]) -> dict[str, Any]:
         vals = [(c.get("variables") or {}).get(k) for c in cases]
         distinct = {str(v) for v in vals if v is not None}
         rows.append({"variable": k, "values": vals, "agree": len(distinct) <= 1})
-    return {"variables": rows, "outcomes": [{"name": c["name"], "outcome": c.get("outcome"), "duration_months": c.get("duration_months")} for c in cases]}
+    return {
+        "variables": rows,
+        "outcomes": [
+            {"name": c["name"], "outcome": c.get("outcome"), "duration_months": c.get("duration_months")}
+            for c in cases
+        ],
+    }

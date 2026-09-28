@@ -20,7 +20,14 @@ def test_parse_and_normalize_feed_item():
     conn = RSSConnector()
     source = {"id": "s1", "type": "newspaper", "languages": ["es"], "paywall": "none"}
     e = parsed.entries[0]
-    item = RawItem(url=e.link, title=e.title, summary=e.summary, published_at="2026-09-28T10:00:00+00:00", authors=["Redacción"], lang="es")
+    item = RawItem(
+        url=e.link,
+        title=e.title,
+        summary=e.summary,
+        published_at="2026-09-28T10:00:00+00:00",
+        authors=["Redacción"],
+        lang="es",
+    )
     doc = conn.normalize(source, item)
     assert doc is not None
     assert doc.canonical_url == "https://diario.test/bce?id=7"  # utm eliminado
@@ -38,13 +45,18 @@ def test_kind_by_source_type():
 
 def test_feed_autodiscovery_from_html():
     html = '<html><head><link rel="alternate" type="application/rss+xml" href="/rss/portada.xml"><link rel="stylesheet" href="/a.css"><link rel="alternate" type="application/atom+xml" href="https://cdn.test/atom.xml"></head></html>'
-    assert feed_links_from_html(html, "https://diario.test/") == ["https://diario.test/rss/portada.xml", "https://cdn.test/atom.xml"]
+    assert feed_links_from_html(html, "https://diario.test/") == [
+        "https://diario.test/rss/portada.xml",
+        "https://cdn.test/atom.xml",
+    ]
 
 
 def test_util_helpers():
     assert clean_html("<p>Hola&nbsp;<b>mundo</b></p><br>Adiós") == "Hola mundo\n\nAdiós"
     assert canonicalize_url("https://x.test/a?fbclid=1&b=2#frag") == "https://x.test/a?b=2"
-    s = split_sentences("El Sr. García habló en Madrid. Dijo que la reforma costará 3.000 millones. ¿Y ahora qué pasará con los presupuestos?")
+    s = split_sentences(
+        "El Sr. García habló en Madrid. Dijo que la reforma costará 3.000 millones. ¿Y ahora qué pasará con los presupuestos?"
+    )
     assert len(s) == 3 and s[0].startswith("El Sr. García")
 
 
@@ -57,7 +69,9 @@ def test_llm_budget_state_without_key(db, monkeypatch):
     st = llm.budget_state()
     assert st["daily_cap_usd"] == 10 and st["spent_today_usd"] == 0 and not st["hard_stop"]
     with db.tx() as conn:
-        conn.execute("INSERT INTO llm_call(at, module, cost_usd, ok) VALUES (datetime('now'), 'test', 9.0, 1)")
+        conn.execute(
+            "INSERT INTO llm_call(at, module, cost_usd, ok) VALUES (datetime('now'), 'test', 9.0, 1)"
+        )
     st = llm.budget_state()
     assert st["pause_noncritical"] and not st["hard_stop"]
     try:

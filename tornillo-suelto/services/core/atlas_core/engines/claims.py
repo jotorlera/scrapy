@@ -28,7 +28,9 @@ HEURISTIC_VERSION = "heuristic:v1"
 CANON_THRESHOLD = 0.82
 MAX_CLAIMS_PER_DOC = 4
 
-_NUM_RE = re.compile(r"\d[\d.,]*\s?(%|por ciento|percent|millones|millions|billion|billones|mil|thousand|€|\$|£|pb|bp|puntos|points|muertos|killed|dead|heridos|injured)|\b\d{2,}\b")
+_NUM_RE = re.compile(
+    r"\d[\d.,]*\s?(%|por ciento|percent|millones|millions|billion|billones|mil|thousand|€|\$|£|pb|bp|puntos|points|muertos|killed|dead|heridos|injured)|\b\d{2,}\b"
+)
 _OPINION_RE = re.compile(
     r"\b(debería|deberían|debe(?:mos)?|hay que|opinión|editorial|creo|pienso|a mi juicio|should|must|ought|in my view|opinion|análisis:|columna|tribuna|op-ed|why .* is wrong|why .* matters)\b",
     re.I,
@@ -37,7 +39,24 @@ _ATTR_RE = re.compile(
     r"(?:según|de acuerdo con|according to|selon|laut|secondo)\s+([^,.;:()\n]{3,70}?)(?=[,.;:]|\s+(?:que|qui|dass|who|which)\b|$)",
     re.I,
 )
-_ARTICLES = ("el ", "la ", "los ", "las ", "the ", "le ", "les ", "der ", "die ", "das ", "il ", "lo ", "un ", "una ", "a ", "an ")
+_ARTICLES = (
+    "el ",
+    "la ",
+    "los ",
+    "las ",
+    "the ",
+    "le ",
+    "les ",
+    "der ",
+    "die ",
+    "das ",
+    "il ",
+    "lo ",
+    "un ",
+    "una ",
+    "a ",
+    "an ",
+)
 _SAID_RE = re.compile(
     r"([A-ZÁÉÍÓÚÑÜ][\w.\-]*(?:\s+[A-ZÁÉÍÓÚÑÜ][\w.\-]*){0,3})\s+(?:dijo|afirmó|aseguró|declaró|anunció|advirtió|señaló|said|says|announced|declared|warned|told|stated|a déclaré|a annoncé|sagte|erklärte)\b",
 )
@@ -69,7 +88,11 @@ def quote_supported(quote: str, text: str) -> bool:
 def _level_for(sentence: str, source: dict[str, Any], is_title: bool) -> str:
     if _OPINION_RE.search(sentence) or _QUESTION_RE.search(sentence):
         return "opinion"
-    if source.get("type") in ("magazine", "newsletter", "think_tank") and not _NUM_RE.search(sentence) and not is_title:
+    if (
+        source.get("type") in ("magazine", "newsletter", "think_tank")
+        and not _NUM_RE.search(sentence)
+        and not is_title
+    ):
         return "opinion"
     if source.get("type") == "academic":
         return "academic"
@@ -85,7 +108,7 @@ def _attribution(sentence: str) -> str | None:
         low = who.lower()
         for a in _ARTICLES:
             if low.startswith(a):
-                who = who[len(a):]
+                who = who[len(a) :]
                 break
         if who and len(who.split()) <= 8:
             return truncate(who, 60)
@@ -106,7 +129,13 @@ def heuristic_claims(doc: dict[str, Any], source: dict[str, Any]) -> list[ClaimC
     full = "\n".join(p for p in (title, lede, text) if p)
     seen: set[str] = set()
 
-    institutional = source.get("type") in ("institution", "central_bank", "court", "statistical_office", "intl_org")
+    institutional = source.get("type") in (
+        "institution",
+        "central_bank",
+        "court",
+        "statistical_office",
+        "intl_org",
+    )
 
     def add(sentence: str, is_title: bool) -> None:
         s = sentence.strip()
@@ -133,7 +162,15 @@ def heuristic_claims(doc: dict[str, Any], source: dict[str, Any]) -> list[ClaimC
             cw += 0.1
         if level == "opinion":
             cw = 0.15
-        out.append(ClaimCandidate(text=s, quote=truncate(s, 300), level=level, check_worthy=min(1.0, cw), attributed_to=attributed))
+        out.append(
+            ClaimCandidate(
+                text=s,
+                quote=truncate(s, 300),
+                level=level,
+                check_worthy=min(1.0, cw),
+                attributed_to=attributed,
+            )
+        )
 
     if title:
         add(title, True)
@@ -216,14 +253,24 @@ def persist_claims(
             if target_claim and best >= CANON_THRESHOLD:
                 # ¿ya hay evidencia de este documento para esta afirmación?
                 dup = conn.execute(
-                    "SELECT 1 FROM claim_evidence WHERE claim_id = ? AND document_id = ?", (target_claim, doc["id"])
+                    "SELECT 1 FROM claim_evidence WHERE claim_id = ? AND document_id = ?",
+                    (target_claim, doc["id"]),
                 ).fetchone()
                 if dup:
                     continue
                 conn.execute(
                     """INSERT INTO claim_evidence(id, claim_id, document_id, stance, quote, extracted_by, confidence, created_at)
                        VALUES (?,?,?,?,?,?,?,?)""",
-                    (new_id(), target_claim, doc["id"], "supports", cand.quote, cand.extracted_by, round(best, 3), ts),
+                    (
+                        new_id(),
+                        target_claim,
+                        doc["id"],
+                        "supports",
+                        cand.quote,
+                        cand.extracted_by,
+                        round(best, 3),
+                        ts,
+                    ),
                 )
                 stats["merged"] += 1
                 claim_id = target_claim
@@ -233,8 +280,20 @@ def persist_claims(
                     """INSERT INTO claim(id, event_id, document_id, text_canonical, text_original, level, status,
                        check_worthy, attributed_to, extracted_by, first_seen_at, created_at)
                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (claim_id, event_id, doc["id"], cand.text, cand.text, cand.level, "unverified",
-                     cand.check_worthy, cand.attributed_to, cand.extracted_by, doc.get("published_at") or ts, ts),
+                    (
+                        claim_id,
+                        event_id,
+                        doc["id"],
+                        cand.text,
+                        cand.text,
+                        cand.level,
+                        "unverified",
+                        cand.check_worthy,
+                        cand.attributed_to,
+                        cand.extracted_by,
+                        doc.get("published_at") or ts,
+                        ts,
+                    ),
                 )
                 conn.execute(
                     """INSERT INTO claim_evidence(id, claim_id, document_id, stance, quote, extracted_by, confidence, created_at)
@@ -254,15 +313,23 @@ def persist_claims(
                 ).fetchall()
             ]
             new_status = compute_status(ev_rows)
-            old_status = conn.execute("SELECT status FROM claim WHERE id = ?", (claim_id,)).fetchone()["status"]
+            old_status = conn.execute("SELECT status FROM claim WHERE id = ?", (claim_id,)).fetchone()[
+                "status"
+            ]
             if new_status != old_status:
                 conn.execute("UPDATE claim SET status = ? WHERE id = ?", (new_status, claim_id))
                 conn.execute(
                     """INSERT INTO claim_revision(id, claim_id, old_status, new_status, reason, evidence_ids, changed_at)
                        VALUES (?,?,?,?,?,?,?)""",
-                    (new_id(), claim_id, old_status, new_status,
-                     f"{len(ev_rows)} evidencias; regla determinista (primaria o ≥2 independientes tier≤2)",
-                     dumps([]), ts),
+                    (
+                        new_id(),
+                        claim_id,
+                        old_status,
+                        new_status,
+                        f"{len(ev_rows)} evidencias; regla determinista (primaria o ≥2 independientes tier≤2)",
+                        dumps([]),
+                        ts,
+                    ),
                 )
                 stats["status_changes"] += 1
     return stats
@@ -289,7 +356,10 @@ def claims_for_event(db: Database, event_id: str, limit: int = 40) -> list[dict[
                 (r["id"],),
             )
         ]
-        d["revisions"] = [dict(x) for x in db.all("SELECT * FROM claim_revision WHERE claim_id = ? ORDER BY changed_at", (r["id"],))]
+        d["revisions"] = [
+            dict(x)
+            for x in db.all("SELECT * FROM claim_revision WHERE claim_id = ? ORDER BY changed_at", (r["id"],))
+        ]
         for rev in d["revisions"]:
             rev["evidence_ids"] = loads(rev.get("evidence_ids"), [])
         out.append(d)

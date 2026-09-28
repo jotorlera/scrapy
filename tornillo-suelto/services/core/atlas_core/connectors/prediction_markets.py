@@ -16,14 +16,73 @@ from ..gazetteer import find_mentions
 POLYMARKET_URL = "https://gamma-api.polymarket.com/markets"
 MANIFOLD_URL = "https://api.manifold.markets/v0/search-markets"
 
-MANIFOLD_TERMS = ("election", "ceasefire", "Fed rate", "ECB", "tariff", "recession", "Ukraine", "Iran", "Spain", "China Taiwan", "inflation", "NATO")
+MANIFOLD_TERMS = (
+    "election",
+    "ceasefire",
+    "Fed rate",
+    "ECB",
+    "tariff",
+    "recession",
+    "Ukraine",
+    "Iran",
+    "Spain",
+    "China Taiwan",
+    "inflation",
+    "NATO",
+)
 
 RELEVANT_HINTS = (
-    "election", "elecciones", "president", "prime minister", "ceasefire", "war", "invasion", "nato", "tariff",
-    "fed", "rate", "ecb", "inflation", "recession", "gdp", "sanction", "ukraine", "russia", "china", "taiwan",
-    "iran", "israel", "gaza", "government", "parliament", "referendum", "eu ", "european", "spain", "france",
-    "germany", "uk ", "brexit", "oil", "opec", "debt", "default", "impeach", "supreme court", "who ", "pandemic",
-    "vaccine", "ai ", "openai", "regulation", "minister", "coup", "protest", "strike", "treaty", "summit",
+    "election",
+    "elecciones",
+    "president",
+    "prime minister",
+    "ceasefire",
+    "war",
+    "invasion",
+    "nato",
+    "tariff",
+    "fed",
+    "rate",
+    "ecb",
+    "inflation",
+    "recession",
+    "gdp",
+    "sanction",
+    "ukraine",
+    "russia",
+    "china",
+    "taiwan",
+    "iran",
+    "israel",
+    "gaza",
+    "government",
+    "parliament",
+    "referendum",
+    "eu ",
+    "european",
+    "spain",
+    "france",
+    "germany",
+    "uk ",
+    "brexit",
+    "oil",
+    "opec",
+    "debt",
+    "default",
+    "impeach",
+    "supreme court",
+    "who ",
+    "pandemic",
+    "vaccine",
+    "ai ",
+    "openai",
+    "regulation",
+    "minister",
+    "coup",
+    "protest",
+    "strike",
+    "treaty",
+    "summit",
 )
 
 
@@ -35,7 +94,13 @@ def _relevant(question: str) -> bool:
 
 
 async def fetch_polymarket(client: httpx.AsyncClient, limit: int = 200) -> list[dict[str, Any]]:
-    params = {"active": "true", "closed": "false", "limit": str(limit), "order": "volume24hr", "ascending": "false"}
+    params = {
+        "active": "true",
+        "closed": "false",
+        "limit": str(limit),
+        "order": "volume24hr",
+        "ascending": "false",
+    }
     r = await client.get(POLYMARKET_URL, params=params)
     r.raise_for_status()
     out = []
@@ -71,7 +136,9 @@ async def fetch_polymarket(client: httpx.AsyncClient, limit: int = 200) -> list[
                 "probability": prob,
                 "volume": float(m.get("volumeNum") or m.get("volume") or 0),
                 "liquidity": float(m.get("liquidityNum") or m.get("liquidity") or 0),
-                "url": f"https://polymarket.com/market/{m.get('slug')}" if m.get("slug") else "https://polymarket.com",
+                "url": f"https://polymarket.com/market/{m.get('slug')}"
+                if m.get("slug")
+                else "https://polymarket.com",
                 "close_at": m.get("endDate"),
                 "tags": [],
             }
@@ -84,7 +151,8 @@ async def fetch_manifold(client: httpx.AsyncClient, per_term: int = 15) -> list[
     for term in MANIFOLD_TERMS:
         try:
             r = await client.get(
-                MANIFOLD_URL, params={"term": term, "sort": "liquidity", "filter": "open", "limit": str(per_term)}
+                MANIFOLD_URL,
+                params={"term": term, "sort": "liquidity", "filter": "open", "limit": str(per_term)},
             )
             r.raise_for_status()
         except httpx.HTTPError:
@@ -125,8 +193,17 @@ def store_markets(db: Database, markets: list[dict[str, Any]]) -> int:
                    ON CONFLICT(id) DO UPDATE SET probability=excluded.probability, volume=excluded.volume,
                    liquidity=excluded.liquidity, fetched_at=excluded.fetched_at, close_at=excluded.close_at""",
                 (
-                    m["id"], m["venue"], m["market_id"], m["question"], m["probability"], m["volume"], m["liquidity"],
-                    m["url"], close_at, ts, json.dumps(m.get("tags") or []),
+                    m["id"],
+                    m["venue"],
+                    m["market_id"],
+                    m["question"],
+                    m["probability"],
+                    m["volume"],
+                    m["liquidity"],
+                    m["url"],
+                    close_at,
+                    ts,
+                    json.dumps(m.get("tags") or []),
                 ),
             )
             n += 1

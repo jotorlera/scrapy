@@ -180,7 +180,11 @@ class ClusterIndex:
         )
         self.events[eid] = ev
         self._ids.append(eid)
-        self._matrix = np.vstack([self._matrix, vec[None, :]]) if self._matrix is not None and self._matrix.size else vec[None, :].copy()
+        self._matrix = (
+            np.vstack([self._matrix, vec[None, :]])
+            if self._matrix is not None and self._matrix.size
+            else vec[None, :].copy()
+        )
         return eid, 1.0, True
 
     def flush(self) -> tuple[int, int]:
@@ -203,9 +207,21 @@ class ClusterIndex:
                            coverage_stats)
                            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                         (
-                            ev.id, ev.title, "lead_document", ev.domain, dumps(ev.countries), dumps(geo),
-                            ev.first_seen_at, ev.last_update_at, "developing", vec_to_blob(ev.centroid), self.model,
-                            ev.n_docs, ev.lead_document_id, dumps(sorted(ev.entity_keys)), dumps({"topics": ev.topics}),
+                            ev.id,
+                            ev.title,
+                            "lead_document",
+                            ev.domain,
+                            dumps(ev.countries),
+                            dumps(geo),
+                            ev.first_seen_at,
+                            ev.last_update_at,
+                            "developing",
+                            vec_to_blob(ev.centroid),
+                            self.model,
+                            ev.n_docs,
+                            ev.lead_document_id,
+                            dumps(sorted(ev.entity_keys)),
+                            dumps({"topics": ev.topics}),
                         ),
                     )
                     created += 1
@@ -213,8 +229,15 @@ class ClusterIndex:
                     conn.execute(
                         """UPDATE event SET centroid=?, n_docs=?, entity_keys=?, countries=?, geo=COALESCE(geo, ?),
                            last_update_at=? WHERE id=?""",
-                        (vec_to_blob(ev.centroid), ev.n_docs, dumps(sorted(ev.entity_keys)), dumps(ev.countries),
-                         dumps(geo), ev.last_update_at, ev.id),
+                        (
+                            vec_to_blob(ev.centroid),
+                            ev.n_docs,
+                            dumps(sorted(ev.entity_keys)),
+                            dumps(ev.countries),
+                            dumps(geo),
+                            ev.last_update_at,
+                            ev.id,
+                        ),
                     )
                     updated += 1
                 ev.dirty = False
@@ -241,7 +264,16 @@ def consolidate_events(db: Database, hours: int = 48) -> dict[str, int]:
         v = blob_to_vec(r["centroid"])
         if v is None:
             continue
-        evs.append((r["id"], v / (np.linalg.norm(v) + 1e-9), set(loads(r["entity_keys"], [])), r["n_docs"], parse_iso(r["last_update_at"]), loads(r["countries"], [])))
+        evs.append(
+            (
+                r["id"],
+                v / (np.linalg.norm(v) + 1e-9),
+                set(loads(r["entity_keys"], [])),
+                r["n_docs"],
+                parse_iso(r["last_update_at"]),
+                loads(r["countries"], []),
+            )
+        )
     if len(evs) < 2:
         return {"merged": 0, "checked": len(evs)}
     M = np.stack([e[1] for e in evs])
@@ -268,24 +300,47 @@ def consolidate_events(db: Database, hours: int = 48) -> dict[str, int]:
     with db.tx() as conn:
         for loser, winner in merges:
             conn.execute("UPDATE document SET event_id = ? WHERE event_id = ?", (winner, loser))
-            conn.execute("UPDATE OR IGNORE event_document SET event_id = ? WHERE event_id = ?", (winner, loser))
+            conn.execute(
+                "UPDATE OR IGNORE event_document SET event_id = ? WHERE event_id = ?", (winner, loser)
+            )
             conn.execute("DELETE FROM event_document WHERE event_id = ?", (loser,))
             conn.execute("UPDATE claim SET event_id = ? WHERE event_id = ?", (winner, loser))
             conn.execute("UPDATE state_delta SET event_id = ? WHERE event_id = ?", (winner, loser))
-            conn.execute("UPDATE OR IGNORE exposure_alert SET event_id = ? WHERE event_id = ?", (winner, loser))
+            conn.execute(
+                "UPDATE OR IGNORE exposure_alert SET event_id = ? WHERE event_id = ?", (winner, loser)
+            )
             conn.execute("DELETE FROM exposure_alert WHERE event_id = ?", (loser,))
-            conn.execute("UPDATE forecast_question SET origin_event_id = ? WHERE origin_event_id = ?", (winner, loser))
+            conn.execute(
+                "UPDATE forecast_question SET origin_event_id = ? WHERE origin_event_id = ?", (winner, loser)
+            )
             conn.execute("UPDATE event SET status = 'merged', merged_into = ? WHERE id = ?", (winner, loser))
             # recomputar centroide, n_docs, países y claves del ganador a partir de sus documentos
-            docs = conn.execute("SELECT embedding, countries FROM document WHERE event_id = ? AND embedding IS NOT NULL", (winner,)).fetchall()
+            docs = conn.execute(
+                "SELECT embedding, countries FROM document WHERE event_id = ? AND embedding IS NOT NULL",
+                (winner,),
+            ).fetchall()
             vecs = [blob_to_vec(d["embedding"]) for d in docs if d["embedding"]]
             countries_all: list[str] = []
             for d in docs:
                 for c in loads(d["countries"], []):
                     if c not in countries_all:
                         countries_all.append(c)
-            w_keys = set(loads(conn.execute("SELECT entity_keys FROM event WHERE id = ?", (winner,)).fetchone()["entity_keys"], []))
-            l_keys = set(loads(conn.execute("SELECT entity_keys FROM event WHERE id = ?", (loser,)).fetchone()["entity_keys"], []))
+            w_keys = set(
+                loads(
+                    conn.execute("SELECT entity_keys FROM event WHERE id = ?", (winner,)).fetchone()[
+                        "entity_keys"
+                    ],
+                    [],
+                )
+            )
+            l_keys = set(
+                loads(
+                    conn.execute("SELECT entity_keys FROM event WHERE id = ?", (loser,)).fetchone()[
+                        "entity_keys"
+                    ],
+                    [],
+                )
+            )
             geo = None
             for c in countries_all:
                 if c in cmap:
@@ -295,7 +350,15 @@ def consolidate_events(db: Database, hours: int = 48) -> dict[str, int]:
                 centroid = np.mean(np.stack(vecs), axis=0).astype(np.float32)
                 conn.execute(
                     "UPDATE event SET centroid = ?, n_docs = ?, countries = ?, entity_keys = ?, geo = COALESCE(geo, ?), last_update_at = MAX(last_update_at, (SELECT last_update_at FROM event WHERE id = ?)) WHERE id = ?",
-                    (vec_to_blob(centroid), len(docs), dumps(countries_all[:6]), dumps(sorted(w_keys | l_keys)[:12]), dumps(geo), loser, winner),
+                    (
+                        vec_to_blob(centroid),
+                        len(docs),
+                        dumps(countries_all[:6]),
+                        dumps(sorted(w_keys | l_keys)[:12]),
+                        dumps(geo),
+                        loser,
+                        winner,
+                    ),
                 )
     return {"merged": len(merges), "checked": len(evs), "winners": sorted({w for _, w in merges})}  # type: ignore[dict-item]
 

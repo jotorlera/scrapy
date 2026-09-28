@@ -34,17 +34,39 @@ def make_source(db: Database, slug: str, **kw) -> str:
 
     sid = new_id()
     row = {
-        "id": sid, "slug": slug, "name": kw.get("name", slug.title()), "domain": f"{slug}.example", "type": kw.get("type", "newspaper"),
-        "tier": kw.get("tier", 2), "country": kw.get("country", "ES"), "languages": dumps(kw.get("languages", ["es"])),
-        "region_bloc": kw.get("bloc", "es"), "state_relation": kw.get("state_relation", "independent"), "ideology_label": kw.get("ideology", "center"),
-        "paywall": "none", "feeds": dumps(kw.get("feeds", [f"https://{slug}.example/feed"])), "feed_status": "curated", "active": 1,
-        "poll_minutes": 30, "review_status": "seed_unverified", "group_name": "test", "created_at": now_iso(),
+        "id": sid,
+        "slug": slug,
+        "name": kw.get("name", slug.title()),
+        "domain": f"{slug}.example",
+        "type": kw.get("type", "newspaper"),
+        "tier": kw.get("tier", 2),
+        "country": kw.get("country", "ES"),
+        "languages": dumps(kw.get("languages", ["es"])),
+        "region_bloc": kw.get("bloc", "es"),
+        "state_relation": kw.get("state_relation", "independent"),
+        "ideology_label": kw.get("ideology", "center"),
+        "paywall": "none",
+        "feeds": dumps(kw.get("feeds", [f"https://{slug}.example/feed"])),
+        "feed_status": "curated",
+        "active": 1,
+        "poll_minutes": 30,
+        "review_status": "seed_unverified",
+        "group_name": "test",
+        "created_at": now_iso(),
     }
     db.insert("source", row)
     return sid
 
 
-def make_doc(db: Database, source_id: str, title: str, lede: str = "", text: str = "", published_at: str | None = None, url: str | None = None) -> str:
+def make_doc(
+    db: Database,
+    source_id: str,
+    title: str,
+    lede: str = "",
+    text: str = "",
+    published_at: str | None = None,
+    url: str | None = None,
+) -> str:
     from atlas_core.db import dumps, new_id, now_iso
     from atlas_core.util import content_hash
 
@@ -53,10 +75,27 @@ def make_doc(db: Database, source_id: str, title: str, lede: str = "", text: str
     db.insert(
         "document",
         {
-            "id": did, "source_id": source_id, "kind": "article", "url": url or f"https://x.example/{did}", "canonical_url": url or f"https://x.example/{did}",
-            "title": title, "lede": lede, "text": text or lede, "lang": "es", "authors": dumps([]), "published_at": ts, "fetched_at": ts,
-            "content_hash": content_hash(title, lede), "extraction_method": "feed", "paywalled": 0, "countries": dumps([]), "meta": dumps({}),
+            "id": did,
+            "source_id": source_id,
+            "kind": "article",
+            "url": url or f"https://x.example/{did}",
+            "canonical_url": url or f"https://x.example/{did}",
+            "title": title,
+            "lede": lede,
+            "text": text or lede,
+            "lang": "es",
+            "authors": dumps([]),
+            "published_at": ts,
+            "fetched_at": ts,
+            "content_hash": content_hash(title, lede),
+            "extraction_method": "feed",
+            "paywalled": 0,
+            "countries": dumps([]),
+            "meta": dumps({}),
         },
     )
-    db.exec("INSERT INTO document_fts(doc_id, title, lede, text) VALUES (?,?,?,?)", (did, title, lede, text or lede))
+    db.exec(
+        "INSERT INTO document_fts(doc_id, title, lede, text) VALUES (?,?,?,?)",
+        (did, title, lede, text or lede),
+    )
     return did

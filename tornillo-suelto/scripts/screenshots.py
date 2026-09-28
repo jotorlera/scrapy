@@ -44,13 +44,17 @@ def main() -> int:
         return 1
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    exe = os.environ.get("CHROMIUM_PATH") or ("/opt/pw-browsers/chromium" if Path("/opt/pw-browsers/chromium").exists() else None)
+    exe = os.environ.get("CHROMIUM_PATH") or (
+        "/opt/pw-browsers/chromium" if Path("/opt/pw-browsers/chromium").exists() else None
+    )
     launch = {"executable_path": exe} if exe else {}
     with sync_playwright() as p:
         browser = p.chromium.launch(**launch)
         for width in (int(w) for w in args.widths.split(",")):
             for theme in ("light", "dark"):
-                ctx = browser.new_context(viewport={"width": width, "height": 960}, color_scheme=theme, locale="es-ES")
+                ctx = browser.new_context(
+                    viewport={"width": width, "height": 960}, color_scheme=theme, locale="es-ES"
+                )
                 page = ctx.new_page()
                 page.add_init_script(f"try{{localStorage.setItem('ts.theme','{theme}')}}catch(e){{}}")
                 for name, route in ROUTES:

@@ -67,7 +67,12 @@ class Scheduler:
         today = local.date().isoformat()
         if self.db.one("SELECT 1 FROM brief WHERE date = ? AND kind = 'study'", (today,)):
             return
-        if self.db.scalar("SELECT COUNT(*) FROM event WHERE last_update_at >= datetime('now','-1 day')", (), 0) < 5:
+        if (
+            self.db.scalar(
+                "SELECT COUNT(*) FROM event WHERE last_update_at >= datetime('now','-1 day')", (), 0
+            )
+            < 5
+        ):
             return
         await asyncio.to_thread(compose_brief, self.db, "study", 24)
         await asyncio.to_thread(compose_brief, self.db, "executive", 24)
@@ -75,22 +80,51 @@ class Scheduler:
             try:
                 from .agents import redact_brief
 
-                b = self.db.one("SELECT id FROM brief WHERE date = ? AND kind = 'study' ORDER BY created_at DESC LIMIT 1", (today,))
+                b = self.db.one(
+                    "SELECT id FROM brief WHERE date = ? AND kind = 'study' ORDER BY created_at DESC LIMIT 1",
+                    (today,),
+                )
                 if b:
                     await asyncio.to_thread(redact_brief, self.db, b["id"])
             except Exception as e:  # noqa: BLE001
                 log.warning("brief LLM: %s", e)
         with self.db.tx() as conn:
-            conn.execute("INSERT INTO alert(id, kind, title, body, ref, created_at) VALUES (?,?,?,?,?,?)", (new_id(), "brief", f"Brief del {today} disponible", "Lectura estimada: 10 minutos.", dumps({"route": "/brief"}), now_iso()))
+            conn.execute(
+                "INSERT INTO alert(id, kind, title, body, ref, created_at) VALUES (?,?,?,?,?,?)",
+                (
+                    new_id(),
+                    "brief",
+                    f"Brief del {today} disponible",
+                    "Lectura estimada: 10 minutos.",
+                    dumps({"route": "/brief"}),
+                    now_iso(),
+                ),
+            )
 
     async def _alerts(self) -> None:
         """Alertas por materialidad alta (umbral push_alert de materiality.yaml)."""
         from .config_loader import materiality_config
 
         th = float((materiality_config().get("thresholds") or {}).get("push_alert", 80))
-        rows = self.db.all("SELECT id, title_neutral, materiality FROM event WHERE materiality >= ? AND last_update_at >= datetime('now','-1 day')", (th,))
+        rows = self.db.all(
+            "SELECT id, title_neutral, materiality FROM event WHERE materiality >= ? AND last_update_at >= datetime('now','-1 day')",
+            (th,),
+        )
         with self.db.tx() as conn:
             for r in rows:
-                if conn.execute("SELECT 1 FROM alert WHERE kind = 'materiality' AND json_extract(ref, '$.event_id') = ?", (r["id"],)).fetchone():
+                if conn.execute(
+                    "SELECT 1 FROM alert WHERE kind = 'materiality' AND json_extract(ref, '$.event_id') = ?",
+                    (r["id"],),
+                ).fetchone():
                     continue
-                conn.execute("INSERT INTO alert(id, kind, title, body, ref, created_at) VALUES (?,?,?,?,?,?)", (new_id(), "materiality", f"Materialidad {r['materiality']:.0f}: {r['title_neutral'][:100]}", None, dumps({"event_id": r["id"], "route": f"/eventos/{r['id']}"}), now_iso()))
+                conn.execute(
+                    "INSERT INTO alert(id, kind, title, body, ref, created_at) VALUES (?,?,?,?,?,?)",
+                    (
+                        new_id(),
+                        "materiality",
+                        f"Materialidad {r['materiality']:.0f}: {r['title_neutral'][:100]}",
+                        None,
+                        dumps({"event_id": r["id"], "route": f"/eventos/{r['id']}"}),
+                        now_iso(),
+                    ),
+                )
