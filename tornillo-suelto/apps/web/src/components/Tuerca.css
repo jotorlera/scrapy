@@ -1,0 +1,266 @@
+/* Tuerca, la gata negra con collar amarillo. Dibujo propio en SVG; solo el cuerpo recibe eventos de ratón. */
+
+.tuerca {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 64px;
+  height: 48px;
+  z-index: 90;
+  pointer-events: none;
+  transition: transform 100ms linear;
+  will-change: transform;
+}
+.tuerca svg {
+  width: 64px;
+  height: 48px;
+  overflow: visible;
+  display: block;
+}
+.tuerca .body-hit {
+  pointer-events: visiblePainted;
+  cursor: pointer;
+}
+.tuerca .fur {
+  fill: #000;
+}
+:root[data-theme='dark'] .tuerca .fur {
+  fill: #050505;
+  stroke: #3a3a3a;
+  stroke-width: 0.8;
+}
+.tuerca .accent {
+  fill: #ffd100;
+}
+.tuerca .whisker {
+  stroke: #9a9a9a;
+  stroke-width: 0.8;
+  stroke-linecap: round;
+}
+.tuerca .eye-open,
+.tuerca .eye-closed,
+.tuerca .eye-happy {
+  display: none;
+}
+.tuerca[data-eyes='open'] .eye-open {
+  display: block;
+}
+.tuerca[data-eyes='closed'] .eye-closed {
+  display: block;
+}
+.tuerca[data-eyes='happy'] .eye-happy {
+  display: block;
+}
+.tuerca .pose-side,
+.tuerca .pose-sit {
+  display: none;
+}
+.tuerca[data-pose='walk'] .pose-side,
+.tuerca[data-pose='swat'] .pose-side {
+  display: block;
+}
+.tuerca[data-pose='sit'] .pose-sit,
+.tuerca[data-pose='lick'] .pose-sit,
+.tuerca[data-pose='sleep'] .pose-sit {
+  display: block;
+}
+
+/* Andar: patas alternas y cola en movimiento */
+.tuerca .leg {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+}
+.tuerca[data-pose='walk'] .leg.a {
+  animation: tuerca-step 360ms ease-in-out infinite alternate;
+}
+.tuerca[data-pose='walk'] .leg.b {
+  animation: tuerca-step 360ms ease-in-out infinite alternate-reverse;
+}
+@keyframes tuerca-step {
+  from {
+    transform: rotate(-22deg);
+  }
+  to {
+    transform: rotate(22deg);
+  }
+}
+.tuerca .tail {
+  transform-box: fill-box;
+  transform-origin: 100% 100%;
+  animation: tuerca-tail 1.6s ease-in-out infinite alternate;
+}
+.tuerca[data-pose='walk'] .tail {
+  animation-duration: 500ms;
+}
+.tuerca .pose-sit .tail {
+  transform-origin: 0% 100%;
+  animation: tuerca-tail-sit 2.4s ease-in-out infinite alternate;
+}
+@keyframes tuerca-tail {
+  from {
+    transform: rotate(-14deg);
+  }
+  to {
+    transform: rotate(16deg);
+  }
+}
+@keyframes tuerca-tail-sit {
+  from {
+    transform: rotate(-6deg);
+  }
+  to {
+    transform: rotate(8deg);
+  }
+}
+.tuerca[data-pose='sleep'] .tail {
+  animation: none;
+}
+
+/* Sentada: respiración */
+.tuerca[data-pose='sit'] .torso,
+.tuerca[data-pose='sleep'] .torso {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: tuerca-breathe 2.6s ease-in-out infinite alternate;
+}
+@keyframes tuerca-breathe {
+  from {
+    transform: scaleY(1);
+  }
+  to {
+    transform: scaleY(1.035);
+  }
+}
+
+/* Lamerse: la pata sube a la cara */
+.tuerca .lick-paw {
+  display: none;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.tuerca[data-pose='lick'] .lick-paw {
+  display: block;
+  animation: tuerca-lick 420ms ease-in-out infinite alternate;
+}
+@keyframes tuerca-lick {
+  from {
+    transform: translateY(0) rotate(0deg);
+  }
+  to {
+    transform: translateY(-4px) rotate(-12deg);
+  }
+}
+.tuerca[data-pose='lick'] .head-sit {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: tuerca-nod 420ms ease-in-out infinite alternate;
+}
+@keyframes tuerca-nod {
+  to {
+    transform: rotate(-5deg) translateY(1px);
+  }
+}
+
+/* Zarpazo */
+.tuerca[data-pose='swat'] .front-paw {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation: tuerca-swat 140ms ease-in-out infinite alternate;
+}
+@keyframes tuerca-swat {
+  from {
+    transform: rotate(-60deg);
+  }
+  to {
+    transform: rotate(20deg);
+  }
+}
+
+/* Dormida: cabeza baja y zetas flotando */
+.tuerca[data-pose='sleep'] .head-sit {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transform: translateY(5px) rotate(8deg);
+}
+.tuerca .zzz {
+  display: none;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  fill: #ffd100;
+}
+.tuerca[data-pose='sleep'] .zzz {
+  display: block;
+}
+.tuerca .zzz text {
+  opacity: 0;
+  animation: tuerca-z 2.4s ease-out infinite;
+}
+.tuerca .zzz text:nth-child(2) {
+  animation-delay: 0.8s;
+}
+.tuerca .zzz text:nth-child(3) {
+  animation-delay: 1.6s;
+}
+@keyframes tuerca-z {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(6px, -14px);
+  }
+}
+
+/* Bocadillo «prrr» */
+.tuerca .bubble {
+  position: absolute;
+  left: 50%;
+  top: -22px;
+  transform: translateX(-50%);
+  background: #ffd100;
+  color: #000;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border: 1px solid #000;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 120ms;
+  pointer-events: none;
+}
+.tuerca .bubble::after {
+  content: '';
+  position: absolute;
+  left: calc(50% - 3px);
+  bottom: -4px;
+  width: 6px;
+  height: 6px;
+  background: #ffd100;
+  border-right: 1px solid #000;
+  border-bottom: 1px solid #000;
+  transform: rotate(45deg);
+}
+.tuerca[data-bubble='on'] .bubble {
+  opacity: 1;
+}
+
+/* El tornillo que rueda por el borde inferior */
+.tuerca-screw {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  z-index: 89;
+  pointer-events: none;
+  transition: transform 100ms linear;
+}
+.tuerca-screw svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}

@@ -1,0 +1,101 @@
+.worldmap {
+  position: relative;
+  width: 100%;
+  background: var(--map-sea);
+  border: 1px solid var(--c-line);
+  overflow: hidden;
+}
+.worldmap svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.worldmap .sphere {
+  fill: var(--map-sea);
+  stroke: none;
+}
+.worldmap .graticule {
+  fill: none;
+  stroke: var(--map-graticule);
+  stroke-width: 0.5;
+}
+.worldmap .country {
+  fill: var(--map-fill);
+  stroke: var(--map-stroke);
+  stroke-width: 0.5;
+  vector-effect: non-scaling-stroke;
+}
+.worldmap .country.has-sheet {
+  cursor: pointer;
+}
+.worldmap .country.has-sheet:hover,
+.worldmap .country.has-sheet:focus-visible {
+  fill: var(--c-surface-2);
+  outline: none;
+  stroke-width: 1;
+}
+.worldmap .country.hl {
+  fill: var(--c-accent);
+}
+.worldmap .ev {
+  stroke: var(--c-bg);
+  stroke-width: 0.8;
+  cursor: pointer;
+  opacity: 0.92;
+}
+.worldmap .ev:hover,
+.worldmap .ev:focus-visible {
+  stroke: var(--c-accent);
+  stroke-width: 2;
+  outline: none;
+}
+.worldmap .halo {
+  fill: none;
+  stroke: var(--c-accent);
+  stroke-width: 2;
+  opacity: 0.9;
+}
+.map-tip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  background: var(--c-bg);
+  border: 1px solid var(--c-black);
+  border-left: 4px solid var(--c-accent);
+  padding: 4px 8px;
+  max-width: 250px;
+  font-size: var(--fs-xs);
+}
+.map-tip .t {
+  color: var(--c-heading);
+  margin-bottom: 2px;
+}
+.map-tip .s {
+  color: var(--c-muted);
+}
+.map-legend {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 10px;
+  color: var(--c-muted);
+  background: color-mix(in srgb, var(--c-bg) 85%, transparent);
+  padding: 3px 6px;
+  max-width: 70%;
+}
+.map-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50% !important;
+  vertical-align: -1px;
+}
+.map-legend .halo-legend {
+  background: transparent;
+  border: 2px solid var(--c-accent);
+  width: 6px;
+  height: 6px;
+}
