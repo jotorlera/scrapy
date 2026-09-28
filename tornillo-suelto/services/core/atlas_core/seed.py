@@ -13,6 +13,15 @@ from .gazetteer import _INSTITUTIONS, countries
 from .seed_data import HISTORICAL_CASES, RBU_MAP, SEED_NOTE
 
 POLL_BY_TIER = {1: 20, 2: 20, 3: 45, 4: 90}
+PRIMARY_TYPES = ("institution", "central_bank", "court", "statistical_office", "intl_org")
+
+
+def _label(s: dict) -> str | None:
+    """Etiqueta ideológica local; las fuentes primarias sin etiqueta son «institutional» por definición."""
+    lab = s.get("lab")
+    if not lab and s.get("t") in PRIMARY_TYPES:
+        return "institutional"
+    return lab
 
 
 def seed_sources(db: Database) -> dict[str, int]:
@@ -41,7 +50,7 @@ def seed_sources(db: Database) -> dict[str, int]:
                         dumps(s.get("l") or []),
                         s.get("bloc"),
                         s.get("st"),
-                        s.get("lab"),
+                        _label(s),
                         s.get("paywall", "none"),
                         dumps(feed_list),
                         "curated" if feed_list else "unknown",
@@ -70,7 +79,7 @@ def seed_sources(db: Database) -> dict[str, int]:
                         dumps(s.get("l") or []),
                         s.get("bloc"),
                         s.get("st"),
-                        s.get("lab"),
+                        _label(s),
                         s.get("paywall", "none"),
                         s.get("group"),
                         dumps(feed_list),

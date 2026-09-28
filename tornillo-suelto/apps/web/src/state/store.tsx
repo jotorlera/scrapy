@@ -43,10 +43,12 @@ const StoreCtx = createContext<StoreValue | null>(null)
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>(DEFAULTS)
   const [settingsLoaded, setLoaded] = useState(false)
+  // Modo de la sesión: arranca en el «modo de inicio» guardado y cambia al navegar, sin tocar el ajuste.
+  const [mode, setModeState] = useState<Mode>(DEFAULTS.mode)
   const [agents, setAgents] = useState<AgentsStatus | null>(null)
   const [currentEvent, setCurrentEvent] = useState<EventSummary | null>(null)
   const [panel, setPanelState] = useState<PanelContent>(null)
-  const [panelOpen, setPanelOpen] = useState(() => window.innerWidth > 1100)
+  const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= 1600)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [toasts, setToasts] = useState<Array<{ id: number; msg: string; kind: 'ok' | 'warn' }>>([])
@@ -55,7 +57,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     api
       .settings()
-      .then((s) => setSettings({ ...DEFAULTS, ...s }))
+      .then((s) => {
+        setSettings({ ...DEFAULTS, ...s })
+        if (s.mode) setModeState(s.mode)
+      })
       .catch(() => undefined)
       .finally(() => setLoaded(true))
   }, [])
@@ -98,8 +103,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       settings,
       settingsLoaded,
       setSetting,
-      mode: settings.mode,
-      setMode: (m) => setSetting('mode', m),
+      mode,
+      setMode: setModeState,
       theme: settings.theme,
       toggleTheme: () => setSetting('theme', settings.theme === 'dark' ? 'light' : 'dark'),
       agents,
@@ -118,7 +123,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       toast,
       toasts,
     }),
-    [settings, settingsLoaded, setSetting, agents, refreshAgents, currentEvent, panel, setPanel, panelOpen, paletteOpen, helpOpen, toast, toasts],
+    [settings, settingsLoaded, setSetting, mode, agents, refreshAgents, currentEvent, panel, setPanel, panelOpen, paletteOpen, helpOpen, toast, toasts],
   )
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
 }

@@ -52,8 +52,26 @@ Actualizado: 2026-09-28 (sesión de construcción inicial, en la nube).
 - DIETA: entropía normalizada por 4 ejes y puntos ciegos sobre el registro local de lectura.
 - SALA DE MÁQUINAS: salud por fuente, jobs, coste LLM por día/módulo/modelo, presupuesto, disparadores.
 
-### Frontend
-- Ver `apps/web/README.md` (construido por el agente frontend; estilo Hespérides, gata Tuerca, 18 rutas).
+### Frontend (`apps/web`, React 19 + TypeScript + Vite)
+- Sistema de diseño Hespérides en `src/styles/tokens.css`: amarillo #FFD100 como único acento, blanco/negro,
+  esquinas rectas, sin sombras ni degradados, filetes amarillos, Noto Sans local (300/400/600/700), cifras en
+  monoespaciada tabular; tema claro por defecto y oscuro completo; densidad compacta/cómoda.
+- Shell: modos ANALISTA/PENSADOR/CEO, navegación por modo, paleta ⌘K (búsqueda + acciones), atajos estilo gmail
+  (`g r/e/p/i/m/g/o/a/h/t/f/c/s/b/d/x`, `j/k`, `o`, `n`, `f`, `?`, `1/2/3`), panel contextual plegable con
+  streaming de agentes y nota rápida, cinta de mercados con sparklines, campana de alertas, ajustes persistidos.
+- 27 rutas con datos reales: Radar (mapa SVG d3-geo), Eventos (8 pestañas, botones de agente con estado sin
+  clave), Prisma (matriz, silencios, léxico, CSV), Primarias (+DIFF), Mercados (cinta, predicción, grafo de
+  canales), Países, Actores, Ágora (editor de mapas argumentales con análisis, genealogía, lentes, tutor),
+  Archivo, Pronósticos (protocolo «tu probabilidad antes que la del sistema», calibración con Wilson), Taller
+  (notas con `[[enlaces]]`, repaso), Megatendencias (estado honesto), Mando, Simulador (modo C), Brief
+  (editorial, imprimible), Dieta, Sala de máquinas, Ayuda.
+- **Tuerca** (`src/components/Tuerca.tsx`): gata negra con collar amarillo en SVG propio; sigue al cursor, se
+  sienta, se lame, se duerme sobre la cinta, persigue un tornillo, ronronea, se aparta de los formularios, se
+  desactiva por ajuste y por `prefers-reduced-motion`.
+- Verificación: `npm run build` sin errores de TypeScript; Playwright recorrió las 27 rutas en claro y oscuro a
+  1440 px sin errores de consola ni peticiones fallidas. Capturas seleccionadas en `docs/capturas/`
+  (`make screenshots` regenera el juego completo).
+- Detalle de arquitectura y carpetas en `apps/web/README.md`.
 
 ## Cómo verlo
 ```
@@ -84,7 +102,9 @@ deterministas son el núcleo y el LLM es una capa opcional etiquetada.
 - **SIMULADOR**: solo modo C (requiere clave). Modos A y B fuera de alcance.
 - **MEGATENDENCIAS**: sin conectores de datos estructurales; pantalla honesta con señales de temas.
 - **Traducción bajo demanda**: no implementada (requiere clave; los documentos se guardan en su idioma).
-- **Tests e2e de UI**: script de capturas (`scripts/screenshots.py`) listo; depende del frontend compilado.
+- **Tests e2e de UI**: solo recorrido con capturas (sin aserciones); sin objetivo móvil (la rejilla colapsa a una
+  columna por debajo de 1000 px).
+- **Marcos (Entman) en PRISMA**: la API devuelve `frames: []` hasta que haya clave; la UI muestra una nota.
 - No hay autenticación: la API escucha solo en 127.0.0.1 (uso personal).
 
 ## Siguiente

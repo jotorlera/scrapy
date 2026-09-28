@@ -50,7 +50,7 @@ export function EventCard({ event, hasQuestion = false, showProvenance = false, 
             {event.n_primary} prim.
           </span>
         )}
-        {event.langs.length > 0 && <span className="mono">{event.langs.slice(0, 4).join(' ')}</span>}
+        {event.langs.length > 0 && <span className="mono">{event.langs.filter((l) => l.length <= 3).slice(0, 4).join(' ')}</span>}
         <span className="flags">
           {isNew && <span className="flag new">24 h</span>}
           {event.silences.length > 0 && (

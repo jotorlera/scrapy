@@ -78,6 +78,14 @@ def feed_links_from_html(html_text: str, base_url: str) -> list[str]:
     return out
 
 
+def _lang_code(value: str | None) -> str | None:
+    """Código ISO 639 (2-3 letras) del <language> del feed; algunos medios ponen ahí su nombre → se descarta."""
+    if not value:
+        return None
+    code = str(value).strip().split("-")[0].split("_")[0].lower()
+    return code if 2 <= len(code) <= 3 and code.isalpha() else None
+
+
 def parse_feed(content: bytes | str) -> feedparser.FeedParserDict:
     return feedparser.parse(content)
 
@@ -158,7 +166,7 @@ class RSSConnector:
                 continue
             result.etag = r.headers.get("etag") or result.etag
             result.last_modified = r.headers.get("last-modified") or result.last_modified
-            feed_lang = (parsed.feed.get("language") or "").split("-")[0].lower() or None
+            feed_lang = _lang_code(parsed.feed.get("language"))
             for e in parsed.entries[:120]:
                 link = e.get("link") or ""
                 if not link:

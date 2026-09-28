@@ -84,3 +84,10 @@ def test_llm_budget_state_without_key(db, monkeypatch):
     assert "Mandato" in text and version == "1"
     cost = llm_mod.Usage(input_tokens=1_000_000, output_tokens=0).cost("claude-haiku-4-5")
     assert cost == 1.0
+
+
+def test_feed_language_code_is_validated():
+    from atlas_core.connectors.rss import _lang_code
+
+    assert _lang_code("es-ES") == "es" and _lang_code("EN") == "en" and _lang_code("zh_CN") == "zh"
+    assert _lang_code("The Korea Herald") is None and _lang_code("") is None and _lang_code(None) is None

@@ -377,6 +377,10 @@ label.field > textarea {
   text-align: right;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.table td.mono {
+  white-space: nowrap;
 }
 .table tr[data-nav-item]:hover,
 .table tr.clickable:hover {

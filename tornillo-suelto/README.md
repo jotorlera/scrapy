@@ -4,7 +4,7 @@
 > Terminal personal de inteligencia (motor **ATLAS**) para el Dr. José Francisco Tornero-Aguilera:
 > política, economía, mercados, geopolítica, ideas y decisiones, en una sola pantalla, local y privada.
 
-![estilo](brand/logos/logo_h_negro.png)
+![RADAR](docs/capturas/radar_light.png)
 
 ## Qué hace hoy
 
@@ -75,4 +75,5 @@ tornillo-suelto/
 6. **Presupuesto**: tope diario configurable; al 80% se pausan las tareas no críticas.
 7. **Sin asesoramiento financiero**: nunca hay órdenes ni brókers.
 
-Más detalle: `docs/PLANTEAMIENTO.md` y `docs/adr/`.
+Más detalle: `docs/PLANTEAMIENTO.md`, `docs/adr/` y `PROGRESS.md`. Capturas de cada pantalla en `docs/capturas/`
+(`make screenshots` las regenera con la API levantada).

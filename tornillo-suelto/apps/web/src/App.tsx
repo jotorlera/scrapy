@@ -1,122 +1,135 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { Suspense, lazy, useEffect, useMemo } from 'react'
+import { Route, Routes, useLocation } from 'react-router-dom'
+import { CommandPalette } from './components/shell/CommandPalette'
+import { ContextPanel } from './components/shell/ContextPanel'
+import { Header } from './components/shell/Header'
+import { MarketTicker } from './components/shell/MarketTicker'
+import { ShortcutsHelp } from './components/shell/ShortcutsHelp'
+import './components/shell/shell.css'
+import { Tuerca } from './components/Tuerca'
+import { Loading } from './components/ui/basics'
+import { useGlobalShortcuts } from './lib/keyboard'
+import { modeForPath, StoreProvider, useStore } from './state/store'
+import { SideNav } from './components/shell/SideNav'
 
-function App() {
-  const [count, setCount] = useState(0)
+const Radar = lazy(() => import('./screens/Radar'))
+const EventsList = lazy(() => import('./screens/EventsList'))
+const EventDetail = lazy(() => import('./screens/EventDetail'))
+const Prism = lazy(() => import('./screens/Prism'))
+const Primaries = lazy(() => import('./screens/Primaries'))
+const Markets = lazy(() => import('./screens/Markets'))
+const Countries = lazy(() => import('./screens/Countries'))
+const CountryDetail = lazy(() => import('./screens/CountryDetail'))
+const Actors = lazy(() => import('./screens/Actors'))
+const Agora = lazy(() => import('./screens/Agora'))
+const MapEditor = lazy(() => import('./screens/MapEditor'))
+const Archive = lazy(() => import('./screens/Archive'))
+const Forecasts = lazy(() => import('./screens/Forecasts'))
+const Taller = lazy(() => import('./screens/Taller'))
+const Megatrends = lazy(() => import('./screens/Megatrends'))
+const Mando = lazy(() => import('./screens/Mando'))
+const Simulator = lazy(() => import('./screens/Simulator'))
+const Brief = lazy(() => import('./screens/Brief'))
+const Diet = lazy(() => import('./screens/Diet'))
+const Machine = lazy(() => import('./screens/Machine'))
+const Help = lazy(() => import('./screens/Help'))
 
+function Toasts() {
+  const { toasts } = useStore()
+  if (!toasts.length) return null
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="toasts" aria-live="polite">
+      {toasts.map((t) => (
+        <div key={t.id} className={`toast ${t.kind}`}>
+          {t.msg}
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      ))}
+    </div>
   )
 }
 
-export default App
+function NotFound() {
+  return (
+    <div>
+      <h1>Ruta no encontrada</h1>
+      <p className="muted">Prueba con «g r» para volver al Radar o ⌘K para buscar.</p>
+    </div>
+  )
+}
+
+function Shell() {
+  const { setPaletteOpen, setHelpOpen, setMode, mode, setPanelOpen, panelOpen, paletteOpen, helpOpen } = useStore()
+  const loc = useLocation()
+
+  // Sincroniza el conmutador de modo con la ruta
+  useEffect(() => {
+    const m = modeForPath(loc.pathname)
+    if (m && m !== mode) setMode(m)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loc.pathname])
+
+  const handlers = useMemo(
+    () => ({
+      openPalette: () => setPaletteOpen(true),
+      openHelp: () => setHelpOpen(true),
+      setMode,
+      togglePanel: () => setPanelOpen(!panelOpen),
+      anyModalOpen: () => paletteOpen || helpOpen || !!document.querySelector('.modal-backdrop'),
+    }),
+    [setPaletteOpen, setHelpOpen, setMode, setPanelOpen, panelOpen, paletteOpen, helpOpen],
+  )
+  useGlobalShortcuts(handlers)
+
+  const flush = loc.pathname === '/'
+  return (
+    <div className="shell">
+      <Header />
+      <SideNav />
+      <main className={`main ${flush ? 'flush' : ''}`} id="main">
+        <Suspense fallback={<Loading text="Cargando pantalla…" />}>
+          <Routes>
+            <Route path="/" element={<Radar />} />
+            <Route path="/eventos" element={<EventsList />} />
+            <Route path="/eventos/:id" element={<EventDetail />} />
+            <Route path="/prisma" element={<Prism />} />
+            <Route path="/prisma/:eventId" element={<Prism />} />
+            <Route path="/primarias" element={<Primaries />} />
+            <Route path="/mercados" element={<Markets />} />
+            <Route path="/paises" element={<Countries />} />
+            <Route path="/paises/:iso2" element={<CountryDetail />} />
+            <Route path="/actores" element={<Actors />} />
+            <Route path="/actores/:id" element={<Actors />} />
+            <Route path="/agora" element={<Agora />} />
+            <Route path="/agora/mapas/:id" element={<MapEditor />} />
+            <Route path="/archivo" element={<Archive />} />
+            <Route path="/pronosticos" element={<Forecasts />} />
+            <Route path="/pronosticos/:id" element={<Forecasts />} />
+            <Route path="/taller" element={<Taller />} />
+            <Route path="/megatendencias" element={<Megatrends />} />
+            <Route path="/mando" element={<Mando />} />
+            <Route path="/simulador" element={<Simulator />} />
+            <Route path="/brief" element={<Brief />} />
+            <Route path="/dieta" element={<Diet />} />
+            <Route path="/maquinas" element={<Machine />} />
+            <Route path="/ayuda" element={<Help />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      </main>
+      <ContextPanel />
+      <MarketTicker />
+      <CommandPalette />
+      <ShortcutsHelp />
+      <Toasts />
+      <Tuerca />
+    </div>
+  )
+}
+
+export default function App() {
+  return (
+    <StoreProvider>
+      <Shell />
+    </StoreProvider>
+  )
+}
