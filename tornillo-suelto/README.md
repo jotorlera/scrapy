@@ -31,15 +31,30 @@ socrático), PRONÓSTICOS y SIMULADOR (superpronosticador) y BRIEF (editor jefe)
 todavía (detalle en `docs/PLANTEAMIENTO.md` §3). Cada llamada queda registrada con su coste. Y sí: **Tuerca**, la
 gata, pasea por la pantalla.
 
-## Arrancar en un comando
+## Instalar en un Mac (sin nada instalado previamente)
+
+Abre Terminal (⌘ + espacio, escribe «Terminal») y pega:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jotorlera/scrapy/claude/cloud-tool-cat-feature-dtnbrj/tornillo-suelto/instalar-mac.sh | bash
+```
+
+No hace falta Python, Node, git, Homebrew ni Xcode. El instalador descarga el código en `~/TornilloSuelto`, instala
+`uv` y un Python 3.12 privados dentro de esa carpeta, usa la interfaz web ya compilada (`apps/web/web-dist.zip`),
+siembra la base de datos, hace una primera ingesta de 40 fuentes y abre <http://127.0.0.1:8765>. Deja
+**«TORNILLO SUELTO.app» en `~/Applications`** para abrirlo con doble clic las siguientes veces, y un lanzador de
+Terminal: `~/TornilloSuelto/tornillo-suelto start|stop|status|log`. Volver a pegar el mismo comando actualiza el código
+y conserva tus datos, tu `.env` y tu `config/perfil.yaml`. Funciona igual en Linux (sin la `.app`).
+
+## Arrancar desde un clon (con Python instalado)
 
 ```bash
 git clone -b claude/cloud-tool-cat-feature-dtnbrj https://github.com/jotorlera/scrapy.git
 cd scrapy/tornillo-suelto && ./arrancar.sh
 ```
 
-`arrancar.sh` (macOS/Linux) comprueba Python ≥ 3.11 y Node ≥ 20, instala todo en `.venv` y `apps/web/node_modules`,
-compila la web, crea `config/perfil.yaml` desde la plantilla, siembra, hace una primera ingesta de 40 fuentes y
+`arrancar.sh` (macOS/Linux) comprueba Python ≥ 3.11, instala todo en `.venv`, compila la web si hay Node ≥ 20 (si no,
+usa `apps/web/web-dist.zip`), crea `config/perfil.yaml` desde la plantilla, siembra, hace una primera ingesta de 40 fuentes y
 abre <http://127.0.0.1:8765>. Con `--rapido` salta la ingesta inicial; con `--solo-instalar` no arranca el servidor.
 En Windows, usa WSL o los cuatro comandos de abajo desde PowerShell.
 

@@ -101,3 +101,19 @@ def test_every_source_file_is_tracked_by_git():
     assert not ignored, (
         f"archivos del proyecto ignorados por git (añade una excepción `!ruta` en .gitignore): {ignored}"
     )
+
+
+def test_prebuilt_web_bundle_is_present_and_complete():
+    """instalar-mac.sh y arrancar.sh sin Node dependen de apps/web/web-dist.zip (SPA compilada).
+
+    Regenerar tras cambiar el frontend: `cd apps/web && npm run build && rm -f web-dist.zip && (cd dist && zip -qr -X ../web-dist.zip .)`.
+    """
+    import zipfile
+
+    z = ROOT / "apps" / "web" / "web-dist.zip"
+    assert z.exists(), "falta apps/web/web-dist.zip (ver docstring para regenerarlo)"
+    with zipfile.ZipFile(z) as zf:
+        names = set(zf.namelist())
+    assert "index.html" in names
+    assert any(n.startswith("assets/") and n.endswith(".js") for n in names)
+    assert any(n.startswith("fonts/") for n in names)

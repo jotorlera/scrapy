@@ -3,7 +3,7 @@ PY := .venv/bin/python
 ATLAS := .venv/bin/atlas
 WEB := apps/web
 
-.PHONY: help install seed ingest markets brief up dev web test lint screenshots clean
+.PHONY: help install seed ingest markets brief up dev web bundle test lint screenshots clean
 
 help:
 	@echo "make install   · crea .venv, instala backend y frontend"
@@ -12,6 +12,7 @@ help:
 	@echo "make markets   · cinta de mercados y mercados de predicción"
 	@echo "make brief     · genera el Brief del día por reglas"
 	@echo "make web       · compila el frontend (apps/web/dist)"
+	@echo "make bundle    · web + apps/web/web-dist.zip (lo usan instalar-mac.sh y arrancar.sh sin Node)"
 	@echo "make up        · levanta todo en http://127.0.0.1:8765 (API + web + planificador)"
 	@echo "make dev       · API en 8765 y Vite en 5173 con recarga"
 	@echo "make test      · pytest"
@@ -35,6 +36,9 @@ brief:
 
 web:
 	cd $(WEB) && npm run build
+
+bundle: web
+	rm -f $(WEB)/web-dist.zip && cd $(WEB)/dist && zip -qr -X ../web-dist.zip .
 
 up: web
 	$(ATLAS) serve

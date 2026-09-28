@@ -3,7 +3,8 @@
 #   ./arrancar.sh            instala, siembra, ingesta unas fuentes y abre http://127.0.0.1:8765
 #   ./arrancar.sh --rapido   salta la ingesta inicial (solo semillas); el planificador ingesta en segundo plano
 #   ./arrancar.sh --solo-instalar   instala y compila, sin arrancar
-# Requisitos: Python ≥ 3.11 y Node ≥ 20 en el PATH. Todo lo demás se instala en ./.venv y apps/web/node_modules.
+# Requisitos: Python ≥ 3.11 en el PATH; Node ≥ 20 opcional (sin él se usa la web precompilada apps/web/web-dist.zip).
+# Sin nada instalado (Mac limpio): usa instalar-mac.sh, que trae su propio Python.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -27,8 +28,8 @@ for c in python3.13 python3.12 python3.11 python3; do
   fi
 done
 [ -n "$PY" ] || fallo "Hace falta Python 3.11 o superior (https://www.python.org/downloads/ o 'brew install python')."
-command -v node >/dev/null 2>&1 || fallo "Hace falta Node 20 o superior (https://nodejs.org o 'brew install node')."
-node -e 'process.exit(parseInt(process.versions.node) >= 20 ? 0 : 1)' || fallo "Node demasiado antiguo: hace falta la versión 20 o superior."
+NODE_OK=0
+if command -v node >/dev/null 2>&1 && node -e 'process.exit(parseInt(process.versions.node) >= 20 ? 0 : 1)'; then NODE_OK=1; fi
 
 # 2. Entorno Python
 paso "Entorno Python en .venv ($("$PY" --version))"
@@ -43,8 +44,13 @@ else
 fi
 
 # 3. Frontend
-paso "Frontend (npm install + build)"
-( cd apps/web && npm install --no-audit --no-fund --silent && npm run build --silent )
+if [ "$NODE_OK" = 1 ]; then
+  paso "Frontend (npm install + build)"
+  ( cd apps/web && npm install --no-audit --no-fund --silent && npm run build --silent )
+else
+  paso "Frontend precompilado (apps/web/web-dist.zip; sin Node no se recompila)"
+  rm -rf apps/web/dist && mkdir -p apps/web/dist && (cd apps/web/dist && unzip -qo ../web-dist.zip)
+fi
 
 # 4. Configuración
 [ -f .env ] || cp .env.example .env
