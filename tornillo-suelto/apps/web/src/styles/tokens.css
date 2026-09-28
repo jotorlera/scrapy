@@ -1,0 +1,128 @@
+/* Tokens de diseño · kit Hespérides (brand/GUIA_ESTILO_HESPERIDES.md) con carácter de terminal.
+   Un único acento (amarillo #FFD100), esquinas rectas, sin sombras ni degradados. */
+
+:root {
+  /* Paleta base */
+  --c-accent: #ffd100;
+  --c-black: #000000;
+  --c-heading: #0b0b0b;
+  --c-text: #1d1d1d;
+  --c-muted: #757575;
+  --c-line: #e6e6e6;
+  --c-bg: #ffffff;
+  --c-surface: #f7f7f7;
+  --c-surface-2: #ededed;
+  --c-link: #2b7bb9;
+  --c-warn: #bd382f;
+  --c-on-accent: #000000;
+
+  /* Botones */
+  --btn-bg: #000000;
+  --btn-fg: #ffffff;
+
+  /* Estados de afirmación (siempre con icono y texto) */
+  --c-confirmed: #2e7d32;
+  --c-disputed: #b26a00;
+  --c-denied: #bd382f;
+  --c-unverified: #757575;
+
+  /* Escala secuencial de un solo tono: amarillo → negro */
+  --c-seq-lo: #ffd100;
+  --c-seq-hi: #000000;
+
+  /* Dominios de evento (solo puntos del mapa y chips pequeños) */
+  --dom-politics: #000000;
+  --dom-economy: #2b7bb9;
+  --dom-conflict: #bd382f;
+  --dom-society: #6a6a6a;
+  --dom-technology: #5b4b8a;
+  --dom-health: #2e7d32;
+  --dom-environment: #3b7f6b;
+  --dom-law: #8a6d3b;
+
+  /* Mapa */
+  --map-fill: #ffffff;
+  --map-stroke: #000000;
+  --map-sea: #ffffff;
+  --map-graticule: #f0f0f0;
+
+  /* Tipografía */
+  --font-ui: 'Noto Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --fs-xs: 11px;
+  --fs-data: 12px;
+  --fs-ui: 13px;
+  --fs-read: 15px;
+  --fs-h2: 20px;
+  --fs-h1: 28px;
+  --lh-data: 1.35;
+  --lh-read: 1.5;
+
+  /* Espaciado (densidad compacta) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --row-h: 26px;
+
+  /* Layout */
+  --header-h: 44px;
+  --nav-w: 168px;
+  --panel-w: 340px;
+  --ticker-h: 34px;
+
+  --motion: 140ms;
+}
+
+:root[data-density='comfortable'] {
+  --fs-data: 13px;
+  --fs-ui: 14px;
+  --fs-read: 16px;
+  --sp-1: 6px;
+  --sp-2: 10px;
+  --sp-3: 16px;
+  --sp-4: 22px;
+  --sp-5: 32px;
+  --row-h: 32px;
+  --nav-w: 188px;
+  --panel-w: 380px;
+}
+
+:root[data-theme='dark'] {
+  --c-black: #000000;
+  --c-heading: #ffffff;
+  --c-text: #f2f2f2;
+  --c-muted: #a0a0a0;
+  --c-line: #2a2a2a;
+  --c-bg: #0b0b0b;
+  --c-surface: #161616;
+  --c-surface-2: #222222;
+  --c-link: #6fb0e6;
+  --c-warn: #e0574d;
+  --btn-bg: #f2f2f2;
+  --btn-fg: #0b0b0b;
+  --c-confirmed: #6cbf6f;
+  --c-disputed: #e0a03a;
+  --c-denied: #e0574d;
+  --c-unverified: #a0a0a0;
+  --c-seq-hi: #f2f2f2;
+  --dom-politics: #f2f2f2;
+  --dom-economy: #6fb0e6;
+  --dom-conflict: #e0574d;
+  --dom-society: #a8a8a8;
+  --dom-technology: #a393d6;
+  --dom-health: #6cbf6f;
+  --dom-environment: #6fb8a3;
+  --dom-law: #c9a876;
+  --map-fill: #161616;
+  --map-stroke: #3a3a3a;
+  --map-sea: #0b0b0b;
+  --map-graticule: #151515;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion: 0ms;
+  }
+}
